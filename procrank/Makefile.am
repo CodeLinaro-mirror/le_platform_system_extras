@@ -1,7 +1,14 @@
-bin_PROGRAMS := procrank
+ACLOCAL_AMFLAGS = -I m4
 
-procrank_SOURCES := procrank.c
+bin_PROGRAMS     = procrank
 
-procrank_CFLAGS := -Wall -Wno-unused-parameter
+procrank_SOURCES = procrank.c
 
-procrank_LDADD := -lpagemap -lcutils
+procrank_CFLAGS  = -Wall -Wno-unused-parameter
+procrank_CFLAGS += -include signal.h
+procrank_CFLAGS += -include stdio.h
+procrank_CFLAGS += -include memory.h
+procrank_CFLAGS += -include unistd.h
+procrank_CFLAGS += -D_GNU_SOURCE
+
+procrank_LDADD   = -lpagemap -lcutils
