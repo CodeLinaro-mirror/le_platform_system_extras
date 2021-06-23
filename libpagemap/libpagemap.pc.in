@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libpagemap
+Description: libpagemap library
+Version: @VERSION@
+Libs: -L${libdir} -lpagemap
+Cflags: -I${includedir} -I${includedir}/pagemap
