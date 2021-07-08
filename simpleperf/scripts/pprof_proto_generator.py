@@ -29,8 +29,8 @@ import os
 import os.path
 
 from simpleperf_report_lib import ReportLib
-from simpleperf_utils import (Addr2Nearestline, BinaryFinder, extant_dir, find_tool_path,
-                              flatten_arg_list, log_info, log_exit, ReadElf)
+from simpleperf_utils import (Addr2Nearestline, BinaryFinder, extant_dir,
+                              flatten_arg_list, log_info, log_exit, ReadElf, ToolFinder)
 try:
     import profile_pb2
 except ImportError:
@@ -435,7 +435,7 @@ class PprofProfileGenerator(object):
         # Try elf_path in binary cache.
         elf_path = self.binary_finder.find_binary(dso_name, build_id_in_perf_data)
         if elf_path:
-            build_id = elf_build_id
+            build_id = build_id_in_perf_data
             binary_path = str(elf_path)
 
         # When there is no matching elf_path, try converting build_id in perf.data.
@@ -481,7 +481,7 @@ class PprofProfileGenerator(object):
         if not self.config.get('binary_cache_dir'):
             log_info("Can't generate line information because binary_cache is missing.")
             return
-        if not find_tool_path('llvm-symbolizer', self.config['ndk_path']):
+        if not ToolFinder.find_tool_path('llvm-symbolizer', self.config['ndk_path']):
             log_info("Can't generate line information because can't find llvm-symbolizer.")
             return
         # We have changed dso names to paths in binary_cache in self.get_binary(). So no need to
@@ -495,10 +495,10 @@ class PprofProfileGenerator(object):
             dso_name = self.get_string(mapping.filename_id)
             if location.lines:
                 function = self.get_function(location.lines[0].function_id)
-                addr2line.add_addr(dso_name, function.vaddr_in_dso, location.vaddr_in_dso)
+                addr2line.add_addr(dso_name, None, function.vaddr_in_dso, location.vaddr_in_dso)
         for function in self.function_list:
             dso_name = self.get_string(function.dso_name_id)
-            addr2line.add_addr(dso_name, function.vaddr_in_dso, function.vaddr_in_dso)
+            addr2line.add_addr(dso_name, None, function.vaddr_in_dso, function.vaddr_in_dso)
 
         # 3. Generate source lines.
         addr2line.convert_addrs_to_lines()
