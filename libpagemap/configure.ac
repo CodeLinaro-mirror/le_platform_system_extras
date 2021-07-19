@@ -39,6 +39,6 @@ AM_CONDITIONAL(X86_64, [test "x$X86_64" = "xyes"])
 
 AC_CONFIG_FILES([ \
     Makefile \
+    libpagemap.pc \
 ])
 AC_OUTPUT
-

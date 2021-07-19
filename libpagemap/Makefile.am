@@ -16,3 +16,7 @@ h_sources = include/pagemap/pagemap.h
 
 libpagemap_includedir      = $(includedir)/pagemap
 libpagemap_include_HEADERS = $(h_sources)
+
+pkgconfigdir   = $(libdir)/pkgconfig
+pkgconfig_DATA = libpagemap.pc
+EXTRA_DIST     = $(pkgconfig_DATA)
