@@ -52,9 +52,13 @@ static int convert_to_mincrypt_format(RSA *rsa, RSAPublicKey *pkey)
     BIGNUM* rem = BN_new();
     BIGNUM* n = BN_new();
     BIGNUM* n0inv = BN_new();
+    BIGNUM* local_n;
+    BIGNUM* local_e;
+    BIGNUM* local_d;
 
     BN_set_bit(r32, 32);
-    BN_copy(n, rsa->n);
+    RSA_get0_key(rsa, &local_n, &local_e, &local_d);
+    BN_copy(n, local_n);
     BN_set_bit(r, RSANUMWORDS * 32);
     BN_mod_sqr(rr, r, n, ctx);
     BN_div(NULL, rem, n, r32, ctx);
@@ -68,7 +72,7 @@ static int convert_to_mincrypt_format(RSA *rsa, RSAPublicKey *pkey)
         BN_div(n, rem, n, r32, ctx);
         pkey->n[i] = BN_get_word(rem);
     }
-    pkey->exponent = BN_get_word(rsa->e);
+    pkey->exponent = BN_get_word(local_e);
 
     ret = 0;
 
