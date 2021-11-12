@@ -171,41 +171,41 @@ static int read_signature(int fd, off64_t offset, BootSignature **bs)
  */
 static int validate_signature_block(const BootSignature *bs, uint64_t length)
 {
-    BIGNUM expected;
-    BIGNUM value;
+    BIGNUM *expected;
+    BIGNUM *value;
     int rc = -1;
 
     if (!bs) {
         return -1;
     }
 
-    BN_init(&expected);
-    BN_init(&value);
+    expected=BN_new();
+    value=BN_new();
 
     /* Confirm that formatVersion matches our supported version */
-    if (!BN_set_word(&expected, FORMAT_VERSION)) {
+    if (!BN_set_word(expected, FORMAT_VERSION)) {
         ERR_print_errors(g_error);
         goto vsb_done;
     }
 
-    ASN1_INTEGER_to_BN(bs->formatVersion, &value);
+    ASN1_INTEGER_to_BN(bs->formatVersion, value);
 
-    if (BN_cmp(&expected, &value) != 0) {
+    if (BN_cmp(expected, value) != 0) {
         printf("Unsupported signature version\n");
         goto vsb_done;
     }
 
-    BN_clear(&expected);
-    BN_clear(&value);
+    BN_clear(expected);
+    BN_clear(value);
 
     /* Confirm that the length of the image matches with the length in
         the authenticated attributes */
     length = htobe64(length);
-    BN_bin2bn((const unsigned char *) &length, sizeof(length), &expected);
+    BN_bin2bn((const unsigned char *) &length, sizeof(length), expected);
 
-    ASN1_INTEGER_to_BN(bs->authenticatedAttributes->length, &value);
+    ASN1_INTEGER_to_BN(bs->authenticatedAttributes->length, value);
 
-    if (BN_cmp(&expected, &value) != 0) {
+    if (BN_cmp(expected, value) != 0) {
         printf("Image length doesn't match signature attributes\n");
         goto vsb_done;
     }
@@ -213,8 +213,8 @@ static int validate_signature_block(const BootSignature *bs, uint64_t length)
     rc = 0;
 
 vsb_done:
-    BN_free(&expected);
-    BN_free(&value);
+    BN_free(expected);
+    BN_free(value);
 
     return rc;
 }
