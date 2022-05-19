@@ -115,8 +115,8 @@ static void next_line(int handle){
 *  Tokenizes the input str with any character in delim and stores the result at pointer in d.
 */
 static void tokenize_assign(char *str, const char* delim, char **d) {
-    char** saveptr;
-    *d = strtok_r(str, delim, saveptr);
+    static char* saveptr;
+    *d = strtok_r(str, delim, &saveptr);
 }
 
 
