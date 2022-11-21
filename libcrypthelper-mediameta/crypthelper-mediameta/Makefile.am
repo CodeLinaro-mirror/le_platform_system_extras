@@ -8,4 +8,5 @@ BUILD_COMPONENTS += tests
 SUBDIRS = $(BUILD_COMPONENTS)
 
 systemddir    = $(root_etcdir)/conf
-systemd_DATA  = $(srcdir)/../sdmsteppe/media-encryption.conf
+
+systemd_DATA  = $(srcdir)/../$(MACHINE_ENABLED)/media-encryption.conf
