@@ -17,16 +17,15 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 PKG_PROG_PKG_CONFIG
 
-#basemachine
-AC_MSG_CHECKING([which base machine to use])
-AC_ARG_WITH([basemachine],
-            [AS_HELP_STRING([--with-basemachine],
-            [Specify the base machine])],
-            [machine_selected="$withval"],
-            [machine_selected=none])
+AC_MSG_CHECKING([which configuration to use])
+AC_ARG_WITH([config],
+            [AS_HELP_STRING([--with-config],
+            [Specify the config name])],
+            [conf_selected="$withval"],
+            [conf_selected=none])
 
-AC_MSG_RESULT([$machine_selected])
-AC_SUBST([MACHINE_ENABLED],[$machine_selected])
+AC_MSG_RESULT([$conf_selected])
+AC_SUBST([CONF_ENABLED],[$conf_selected])
 
 AC_CONFIG_FILES([ \
     Makefile \
