@@ -29,7 +29,6 @@
 #include <netlink/msg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/cdefs.h>
 #include <time.h>
 #include <unistd.h>
 
