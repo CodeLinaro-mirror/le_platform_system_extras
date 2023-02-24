@@ -202,8 +202,13 @@ bool ParseOptionsForApiLevel(unsigned int first_api_level, const std::string& op
             return false;
         }
     }
+    bool is_ota = base::GetBoolProperty("ro.vendor.ota.update", false);
+    if (is_ota) {
+       options->version = 1;
+    } else {
     // Default to v2 after Q
-    options->version = first_api_level > __ANDROID_API_Q__ ? 2 : 1;
+       options->version = first_api_level > __ANDROID_API_Q__ ? 2 : 1;
+    }
     options->flags = 0;
     options->use_hw_wrapped_key = false;
     if (parts.size() > 2 && !parts[2].empty()) {
@@ -237,6 +242,10 @@ bool ParseOptionsForApiLevel(unsigned int first_api_level, const std::string& op
         options->flags |= FSCRYPT_POLICY_FLAGS_PAD_4;
     } else {
         options->flags |= FSCRYPT_POLICY_FLAGS_PAD_16;
+    }
+
+    if (is_ota) {
+       options->flags = FSCRYPT_POLICY_FLAGS_PAD_4;
     }
 
     // Use DIRECT_KEY for Adiantum, since it's much more efficient but just as
