@@ -9,4 +9,4 @@ SUBDIRS = $(BUILD_COMPONENTS)
 
 systemddir    = $(root_etcdir)/conf
 
-systemd_DATA  = $(srcdir)/../$(MACHINE_ENABLED)/media-encryption.conf
+systemd_DATA  = $(srcdir)/../configs/media-encryption/$(CONF_ENABLED)
