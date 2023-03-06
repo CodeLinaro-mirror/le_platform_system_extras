@@ -9,7 +9,7 @@ URL: https://www.codelinaro.org/
 #Source0: ext4-utils-1.0.tar.gz
 Source0: %{name}-%{version}.tar.gz
 
-BuildRequires: autoconf automake libcutils-dev libsparse-dev libtool gcc-g++
+BuildRequires: autoconf automake libcutils-dev libsparse-dev libtool gcc-g++ libselinux-devel
 
 %description
 Command line tools to make sparse images from ext4 file system
