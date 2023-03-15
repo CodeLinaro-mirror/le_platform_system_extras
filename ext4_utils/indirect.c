@@ -307,7 +307,7 @@ static void reserve_all_indirect_blocks(struct block_allocation *alloc, u32 len)
 	if (len == 0)
 		return;
 
-	error("%d blocks remaining", len);
+	error("%u blocks remaining", len);
 }
 
 static u32 indirect_blocks_needed(u32 len)
@@ -392,7 +392,7 @@ static struct block_allocation *do_inode_allocate_indirect(
 	struct block_allocation *alloc = allocate_blocks(block_len + indirect_len);
 
 	if (alloc == NULL) {
-		error("Failed to allocate %d blocks", block_len + indirect_len);
+		error("Failed to allocate %u blocks", block_len + indirect_len);
 		return NULL;
 	}
 
@@ -435,7 +435,7 @@ void inode_attach_resize(struct ext4_inode *inode,
 	u64 size;
 
 	if (block_len % info.bg_desc_reserve_blocks)
-		critical_error("reserved blocks not a multiple of %d",
+		critical_error("reserved blocks not a multiple of %u",
 				info.bg_desc_reserve_blocks);
 
 	append_oob_allocation(alloc, 1);
