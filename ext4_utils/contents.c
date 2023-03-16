@@ -159,7 +159,7 @@ u32 make_directory(u32 dir_inode_num, u32 entries, struct dentry *dentries,
 		dentry = add_dentry(data, &offset, dentry, 0,
 				dentries[i].filename, dentries[i].file_type);
 		if (offset > len || (offset == len && i != entries - 1))
-			critical_error("internal error: dentry for %s ends at %d, past %d\n",
+			critical_error("internal error: dentry for %s ends at %u, past %u\n",
 				dentries[i].filename, offset, len);
 		dentries[i].inode = &dentry->inode;
 		if (!dentry) {

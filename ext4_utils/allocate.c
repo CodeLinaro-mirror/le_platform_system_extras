@@ -147,9 +147,9 @@ void print_blocks(FILE* f, struct block_allocation *alloc, char separator)
 	struct region *reg;
 	for (reg = alloc->list.first; reg; reg = reg->next) {
 		if (reg->len == 1) {
-			fprintf(f, "%d ", reg->block);
+			fprintf(f, "%u ", reg->block);
 		} else {
-			fprintf(f, "%d-%d ", reg->block, reg->block + reg->len - 1);
+			fprintf(f, "%u-%u ", reg->block, reg->block + reg->len - 1);
 		}
 	}
 	fputc('\n', f);
@@ -311,7 +311,7 @@ static void init_bg(struct block_group_info *bg, unsigned int i)
 	bg->flags = EXT4_BG_INODE_UNINIT;
 
 	if (reserve_blocks(bg, bg->first_free_block, bg->header_blocks) < 0)
-		error("failed to reserve %u blocks in block group %u\n", bg->header_blocks, i);
+		error("failed to reserve %d blocks in block group %u\n", bg->header_blocks, i);
 
 	if (bg->first_block + info.blocks_per_group > aux_info.len_blocks) {
 		u32 overrun = bg->first_block + info.blocks_per_group - aux_info.len_blocks;
@@ -350,7 +350,7 @@ static u32 ext4_allocate_blocks_from_block_group(u32 len, int bg_num)
 	u32 block = aux_info.bgs[bg_num].first_free_block;
 	struct block_group_info *bg = &aux_info.bgs[bg_num];
 	if (reserve_blocks(bg, bg->first_free_block, len) < 0) {
-		error("failed to reserve %u blocks in block group %u\n", len, bg_num);
+		error("failed to reserve %u blocks in block group %d\n", len, bg_num);
 		return EXT4_ALLOCATE_FAILED;
 	}
 
@@ -394,7 +394,7 @@ static struct region *ext4_allocate_best_fit_partial(u32 len)
 		struct region *reg;
 		u32 block = ext4_allocate_blocks_from_block_group(allocate_len, found_bg);
 		if (block == EXT4_ALLOCATE_FAILED) {
-			error("failed to allocate %d blocks in block group %d", allocate_len, found_bg);
+			error("failed to allocate %u blocks in block group %u", allocate_len, found_bg);
 			return NULL;
 		}
 		reg = malloc(sizeof(struct region));
@@ -645,7 +645,7 @@ int append_oob_allocation(struct block_allocation *alloc, u32 len)
 	struct region *reg = ext4_allocate_best_fit(len);
 
 	if (reg == NULL) {
-		error("failed to allocate %d blocks", len);
+		error("failed to allocate %u blocks", len);
 		return -1;
 	}
 
@@ -676,7 +676,7 @@ struct ext4_xattr_header *get_xattr_block_for_inode(struct ext4_inode *inode)
 	u32 block_num = allocate_block();
 	block = calloc(info.block_size, 1);
 	if (block == NULL) {
-		error("get_xattr: failed to allocate %d", info.block_size);
+		error("get_xattr: failed to allocate %u", info.block_size);
 		return NULL;
 	}
 

@@ -82,7 +82,7 @@ static struct block_allocation *do_inode_allocate_extents(
 	u64 blocks;
 
 	if (alloc == NULL) {
-		error("Failed to allocate %d blocks\n", block_len + 1);
+		error("Failed to allocate %u blocks\n", block_len + 1);
 		return NULL;
 	}
 
