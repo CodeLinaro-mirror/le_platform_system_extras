@@ -22,7 +22,7 @@ AC_ARG_WITH([config],
             [AS_HELP_STRING([--with-config],
             [Specify the config name])],
             [conf_selected="$withval"],
-            [conf_selected=none])
+            [conf_selected="default.conf"])
 
 AC_MSG_RESULT([$conf_selected])
 AC_SUBST([CONF_ENABLED],[$conf_selected])
