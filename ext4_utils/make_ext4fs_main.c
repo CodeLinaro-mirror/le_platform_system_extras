@@ -34,10 +34,12 @@
 #endif
 
 #ifndef USE_MINGW
+#ifdef SELINUX_IS_ENABLE
 #include <selinux/selinux.h>
 #include <selinux/label.h>
 #if !defined(HOST)
 #include <selinux/android.h>
+#endif
 #endif
 #else
 struct selabel_handle;
@@ -82,10 +84,12 @@ int main(int argc, char **argv)
 	int exitcode;
 	int verbose = 0;
 	time_t fixed_time = -1;
-	struct selabel_handle *sehnd = NULL;
+        struct selabel_handle *sehnd = NULL;
 	FILE* block_list_file = NULL;
 #ifndef USE_MINGW
+#ifdef SELINUX_IS_ENABLE
 	struct selinux_opt seopts[] = { { SELABEL_OPT_PATH, "" } };
+#endif
 #endif
 
 	while ((opt = getopt(argc, argv, "l:j:b:g:i:I:L:a:S:T:C:B:fwzJsctvu")) != -1) {
@@ -140,12 +144,14 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 #ifndef USE_MINGW
+#ifdef SELINUX_IS_ENABLE
 			seopts[0].value = optarg;
 			sehnd = selabel_open(SELABEL_CTX_FILE, seopts, 1);
 			if (!sehnd) {
 				perror(optarg);
 				exit(EXIT_FAILURE);
 			}
+#endif
 #endif
 			break;
 		case 'v':
@@ -171,6 +177,7 @@ int main(int argc, char **argv)
 	}
 
 #if !defined(HOST)
+#ifdef SELINUX_IS_ENABLE
 	// Use only if -S option not requested
 	if (!sehnd && mountpoint) {
 		sehnd = selinux_android_file_context_handle();
@@ -180,6 +187,7 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 	}
+#endif
 #endif
 	printf("fs_config_file: %s\n", (fs_config_file)?fs_config_file:"(none)");
 	if (fs_config_file) {

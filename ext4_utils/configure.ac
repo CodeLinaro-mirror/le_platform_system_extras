@@ -59,6 +59,12 @@
   AM_CONDITIONAL(BUILD_HOST, [test "x$X86_64" = "xyes"])
   AM_CONDITIONAL(BUILD_DEVICE, [test "x$ARM$ARM64" != "xnono"])
 
+  AC_ARG_ENABLE(selinux,
+      AC_HELP_STRING([--enable-selinux], [DISTRO enable selinux feature.]),
+          [selinux_enable=${enableval}], [selinux_enable="no"])
+
+  AM_CONDITIONAL(SELINUX_ENABLE, [test "x${selinux_enable}" = "xyes"])
+
 AC_CONFIG_FILES([ \
     Makefile \
     ext4_utils.pc
