@@ -176,12 +176,12 @@ static int read_inode(int fd, unsigned int inum, struct ext4_inode *inode)
                     (bg_offset * info.inode_size);
 
     if (lseek64(fd, inode_offset, SEEK_SET) < 0) {
-        critical_error_errno("failed to seek to inode %d\n", inum);
+        critical_error_errno("failed to seek to inode %u\n", inum);
     }
 
     len=read(fd, inode, sizeof(*inode));
     if (len != sizeof(*inode)) {
-        critical_error_errno("failed to read inode %d\n", inum);
+        critical_error_errno("failed to read inode %u\n", inum);
     }
 
     return 0;
@@ -195,12 +195,12 @@ static int read_block(int fd, unsigned long long block_num, void *block)
     off = block_num * info.block_size;
 
     if (lseek64(fd, off, SEEK_SET) , 0) {
-        critical_error_errno("failed to seek to block %lld\n", block_num);
+        critical_error_errno("failed to seek to block %llu\n", block_num);
     }
 
     len=read(fd, block, info.block_size);
     if (len != info.block_size) {
-        critical_error_errno("failed to read block %lld\n", block_num);
+        critical_error_errno("failed to read block %llu\n", block_num);
     }
 
     return 0;
@@ -218,12 +218,12 @@ static int write_block(int fd, unsigned long long block_num, void *block)
     off = block_num * info.block_size;
 
     if (lseek64(fd, off, SEEK_SET) < 0) {
-        critical_error_errno("failed to seek to block %lld\n", block_num);
+        critical_error_errno("failed to seek to block %llu\n", block_num);
     }
 
     len=write(fd, block, info.block_size);
     if (len != info.block_size) {
-        critical_error_errno("failed to write block %lld\n", block_num);
+        critical_error_errno("failed to write block %llu\n", block_num);
     }
 
     return 0;
@@ -252,7 +252,7 @@ static void check_inode_bitmap(int fd, unsigned int bg_num)
 
     if (bitmap_updated) {
         if (verbose) {
-            printf("Warning: updated inode bitmap for block group %d\n", bg_num);
+            printf("Warning: updated inode bitmap for block group %u\n", bg_num);
         }
         write_block(fd, inode_bitmap_block_num, block);
     }
@@ -276,7 +276,7 @@ static int update_superblocks_and_bg_desc(int fd, int state)
     total_new_inodes = num_block_groups * (new_inodes_per_group - sb.s_inodes_per_group);
 
     if (verbose) {
-        printf("created %d additional inodes\n", total_new_inodes);
+        printf("created %u additional inodes\n", total_new_inodes);
     }
 
     /* Update the free inodes count in each block group descriptor */
@@ -538,7 +538,7 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
     }
 
     if (dirsize % info.block_size) {
-        critical_error("dirsize %d not a multiple of block_size %d.  This is unexpected!\n",
+        critical_error("dirsize %d not a multiple of block_size %u.  This is unexpected!\n",
                 dirsize, info.block_size);
     }
 
@@ -615,11 +615,11 @@ static int recurse_dir(int fd, struct ext4_inode *inode, char *dirbuf, int dirsi
             read_inode(fd, dirp->inode & 0x7fffffff, &tmp_inode);
 
             if (!S_ISDIR(tmp_inode.i_mode)) {
-                critical_error("inode %d for name %s does not point to a directory\n",
+                critical_error("inode %u for name %s does not point to a directory\n",
                         dirp->inode & 0x7fffffff, name);
             }
             if (verbose) {
-                printf("inode %d %s use extents\n", dirp->inode & 0x7fffffff,
+                printf("inode %u %s use extents\n", dirp->inode & 0x7fffffff,
                        (tmp_inode.i_flags & EXT4_EXTENTS_FL) ? "does" : "does not");
             }
 
@@ -753,7 +753,7 @@ int ext4fixup_internal(char *fsdev, int v_flag, int n_flag,
 
     dirsize = root_inode.i_blocks_lo * INODE_BLOCK_SIZE;
     if (verbose) {
-        printf("root dir size = %d bytes\n", dirsize);
+        printf("root dir size = %u bytes\n", dirsize);
     }
 
     dirbuf = malloc(dirsize);

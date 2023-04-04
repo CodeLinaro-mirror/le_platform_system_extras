@@ -59,7 +59,9 @@
   AM_CONDITIONAL(BUILD_HOST, [test "x$X86_64" = "xyes"])
   AM_CONDITIONAL(BUILD_DEVICE, [test "x$ARM$ARM64" != "xnono"])
 
-
-AC_OUTPUT([ \
+AC_CONFIG_FILES([ \
     Makefile \
-  ])
+    ext4_utils.pc
+])
+AC_OUTPUT
+
