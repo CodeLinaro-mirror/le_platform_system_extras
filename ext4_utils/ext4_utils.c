@@ -573,16 +573,16 @@ int read_ext(int fd, int verbose)
 
 	if (verbose) {
 		printf("Found filesystem with parameters:\n");
-		printf("    Size: %"PRIu64"\n", info.len);
-		printf("    Block size: %d\n", info.block_size);
-		printf("    Blocks per group: %d\n", info.blocks_per_group);
-		printf("    Inodes per group: %d\n", info.inodes_per_group);
-		printf("    Inode size: %d\n", info.inode_size);
+		printf("    Size: %"PRId64"\n", info.len);
+		printf("    Block size: %u\n", info.block_size);
+		printf("    Blocks per group: %u\n", info.blocks_per_group);
+		printf("    Inodes per group: %u\n", info.inodes_per_group);
+		printf("    Inode size: %u\n", info.inode_size);
 		printf("    Label: %s\n", info.label);
 		printf("    Blocks: %"PRIu64"\n", aux_info.len_blocks);
-		printf("    Block groups: %d\n", aux_info.groups);
-		printf("    Reserved block group size: %d\n", info.bg_desc_reserve_blocks);
-		printf("    Used %d/%d inodes and %d/%d blocks\n",
+		printf("    Block groups: %u\n", aux_info.groups);
+		printf("    Reserved block group size: %u\n", info.bg_desc_reserve_blocks);
+		printf("    Used %u/%u inodes and %u/%u blocks\n",
 			aux_info.sb->s_inodes_count - aux_info.sb->s_free_inodes_count,
 			aux_info.sb->s_inodes_count,
 			aux_info.sb->s_blocks_count_lo - aux_info.sb->s_free_blocks_count_lo,
