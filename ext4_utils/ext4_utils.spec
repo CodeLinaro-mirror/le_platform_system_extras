@@ -1,4 +1,4 @@
-Name: ext4_utils
+Name: ext4-utils
 Version: 1.0
 Release: r0
 Summary: Android ext4-utils tools
@@ -6,10 +6,10 @@ Summary: Android ext4-utils tools
 License: Apache-2.0
 
 URL: https://www.codelinaro.org/
-#Source0: ext4_utils-1.0.tar.gz
-Source0: ext4_utils.tar.gz
+#Source0: ext4-utils-1.0.tar.gz
+Source0: %{name}-%{version}.tar.gz
 
-BuildRequires: autoconf automake libcutils libsparse libtool gcc-g++
+BuildRequires: autoconf automake libcutils-dev libsparse-dev libtool gcc-g++
 
 %description
 Command line tools to make sparse images from ext4 file system
@@ -17,12 +17,13 @@ images and android images(.img) with ext4 file systems.
 This package contains tools like mkuserimg, ext4fixup
 and make_ext4fs tools.
 
-%package -n libext4-utils-dev
+# subpackage named ${name}-dev -> "ext4-utils-dev"
+%package dev
 Summary: Android ext4-utils tools - Development files
 License: Apache-2.0
 Requires: %{name} = %{version}-%{release}
 
-%description -n libext4-utils-dev
+%description dev
 Command line tools to make sparse images from ext4 file system
 images and android images(.img) with ext4 file systems.
 This package contains tools like mkuserimg, ext4fixup and
@@ -47,7 +48,8 @@ autoreconf -if
 %{_libdir}/libext4_utils.so.0
 %{_libdir}/libext4_utils.so.0.0.0
 
-%files -n libext4-utils-dev
+%files dev
+%dir %{_includedir}/ext4_utils
 %{_includedir}/ext4_utils/ext4.h
 %{_includedir}/ext4_utils/ext4_crypt_init_extensions.h
 %{_includedir}/ext4_utils/ext4_extents.h
@@ -59,3 +61,4 @@ autoreconf -if
 %{_includedir}/ext4_utils/wipe.h
 %{_includedir}/ext4_utils/xattr.h
 %{_libdir}/libext4_utils.so
+%{_libdir}/pkgconfig/ext4_utils.pc
