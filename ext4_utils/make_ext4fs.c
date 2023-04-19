@@ -576,19 +576,19 @@ int make_ext4fs_internal(int fd, const char *_directory, const char *_target_out
 	info.bg_desc_reserve_blocks = compute_bg_desc_reserve_blocks();
 
 	printf("Creating filesystem with parameters:\n");
-	printf("    Size: %"PRIu64"\n", info.len);
-	printf("    Block size: %d\n", info.block_size);
-	printf("    Blocks per group: %d\n", info.blocks_per_group);
-	printf("    Inodes per group: %d\n", info.inodes_per_group);
-	printf("    Inode size: %d\n", info.inode_size);
-	printf("    Journal blocks: %d\n", info.journal_blocks);
+	printf("    Size: %"PRId64"\n", info.len);
+	printf("    Block size: %u\n", info.block_size);
+	printf("    Blocks per group: %u\n", info.blocks_per_group);
+	printf("    Inodes per group: %u\n", info.inodes_per_group);
+	printf("    Inode size: %u\n", info.inode_size);
+	printf("    Journal blocks: %u\n", info.journal_blocks);
 	printf("    Label: %s\n", info.label);
 
 	ext4_create_fs_aux_info();
 
 	printf("    Blocks: %"PRIu64"\n", aux_info.len_blocks);
-	printf("    Block groups: %d\n", aux_info.groups);
-	printf("    Reserved block group size: %d\n", info.bg_desc_reserve_blocks);
+	printf("    Block groups: %u\n", aux_info.groups);
+	printf("    Reserved block group size: %u\n", info.bg_desc_reserve_blocks);
 
 	ext4_sparse_file = sparse_file_new(info.block_size, info.len);
 
@@ -658,7 +658,7 @@ int make_ext4fs_internal(int fd, const char *_directory, const char *_target_out
 		}
 	}
 
-	printf("Created filesystem with %d/%d inodes and %d/%d blocks\n",
+	printf("Created filesystem with %u/%u inodes and %u/%u blocks\n",
 			aux_info.sb->s_inodes_count - aux_info.sb->s_free_inodes_count,
 			aux_info.sb->s_inodes_count,
 			aux_info.sb->s_blocks_count_lo - aux_info.sb->s_free_blocks_count_lo,
