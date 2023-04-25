@@ -65,3 +65,6 @@ ext4_utils_include_HEADERS += make_ext4fs.h
 ext4_utils_include_HEADERS += wipe.h
 ext4_utils_include_HEADERS += xattr.h
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = ext4_utils.pc
+EXTRA_DIST = $(pkgconfig_DATA)
