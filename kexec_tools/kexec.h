@@ -1,7 +1,6 @@
 #ifndef _SYS_KEXEC_H
 #define _SYS_KEXEC_H
 
-#include <sys/cdefs.h>
 #include <linux/kexec.h>
 #include <unistd.h>
 #include <sys/syscall.h>
