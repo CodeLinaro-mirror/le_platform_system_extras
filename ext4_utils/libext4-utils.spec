@@ -41,12 +41,14 @@ autoreconf -if
 %make_install
 
 %files
+%license NOTICE
 %{_libdir}/libext4_utils.a
 %{_libdir}/libext4_utils.la
 %{_libdir}/libext4_utils.so.0
 %{_libdir}/libext4_utils.so.0.0.0
 
 %files dev
+%license NOTICE
 %dir %{_includedir}/ext4_utils
 %{_includedir}/ext4_utils/ext4.h
 %{_includedir}/ext4_utils/ext4_crypt_init_extensions.h
