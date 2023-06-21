@@ -53,6 +53,10 @@ make_ext4fs_CFLAGS  += -DHOST
 make_ext4fs_LDADD   := libext4_utils.la
 make_ext4fs_LDADD   += -lcutils -lsparse
 
+if SELINUX_ENABLE
+make_ext4fs_CFLAGS += -DSELINUX_IS_ENABLE
+endif
+
 ext2simg_SOURCES := ext2simg.c
 ext2simg_CFLAGS  := $(AM_CFLAGS)
 ext2simg_CFLAGS  += -DANDROID
