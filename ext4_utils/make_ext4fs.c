@@ -103,11 +103,14 @@ static u32 build_default_directory_structure(const char *dir_path,
 		char *secontext = NULL;
 
 		asprintf(&path, "%slost+found", dir_path);
-		if (selabel_lookup(sehnd, &secontext, path, S_IFDIR) < 0) {
-			error("cannot lookup security context for %s", path);
-		} else {
-			inode_set_selinux(inode, secontext);
-			freecon(secontext);
+		if(path != NULL)
+		{
+			if (selabel_lookup(sehnd, &secontext, path, S_IFDIR) < 0) {
+				error("cannot lookup security context for %s", path);
+			} else {
+				inode_set_selinux(inode, secontext);
+				freecon(secontext);
+			}
 		}
 		free(path);
 	}
