@@ -44,10 +44,21 @@ int main(int argc, char *argv[]){
 	mem_detail.mem_mapp = (char*)malloc(sizeof(char)*50);
 	mem_detail.mem_apps_usage = (char*)malloc(sizeof(char)*50);
 	mem_detail.mem_kernel_usage = (char*)malloc(sizeof(char)*50);
+	if(mem_detail.mem_total == NULL || mem_detail.mem_free == NULL ||  mem_detail.mem_aval == NULL || 
+           mem_detail.mem_cache == NULL || mem_detail.mem_anon == NULL || mem_detail.mem_mapp == NULL ||
+           mem_detail.mem_apps_usage == NULL || mem_detail.mem_kernel_usage == NULL)
+	{
+		perror("Memory allocation failed\n");
+		return -1;
+	}
 
 	if(strcmp(argv[1], "memory") == 0){
 	        printf("memory details :\n");
-		memdetail(&mem_detail);
+		char *out = memdetail(&mem_detail);
+		if(out == NULL){
+			printf("Failed to get memory details\n");
+			return -1;
+		}
 		printf("Memory Total : %skB\n", mem_detail.mem_total);
 		printf("Memory Free : %skB\n", mem_detail.mem_free);
 		printf("%s\n", mem_detail.mem_aval);
@@ -60,35 +71,56 @@ int main(int argc, char *argv[]){
 	} else if(strcmp(argv[1], "log") == 0){
 	        printf("log detail : \n");
 		char *out = logdetail();
-                if(out != NULL)
+                if(out == NULL){
+			printf("Failed to get log details\n");
+			return -1;
+		}else
                         printf("%s", out);
 				free(out);
 	} else if(strcmp(argv[1], "pscount") == 0){
 		printf("process count : \n");
 		char *out = pscount();
-		if(out != NULL)
+		if(out == NULL){
+			printf("Failed to get PS count\n");
+			return -1;
+		}else
 			printf("%s", out);
 		free(out);
 	} else if(strcmp(argv[1], "cpu") == 0){
 		printf("Cpu Usage : ");
 		float out = cpudetail();
+		if(out == -1.0f){
+			perror("failed to fetch cpu details\n");
+			return -1;
+		}else
 			printf("%.2f%%\n", out);
 	} else if(strcmp(argv[1], "sst") == 0){
 		printf("Device start time : \n");
 		char *out = starttime();
-		if(out != NULL)
+		if(out == NULL){
+			perror("failed to get starttime\n");
+			return -1;
+		}else
 			printf("%s", out);
 		free(out);
 	} else if(strcmp(argv[1], "osv") == 0){
 		printf("OS version : \n");
 		char *out = osdetail();
-		if(out != NULL)
+		if(out == NULL){
+			printf("Failed to get OS details\n");
+			return -1;
+		}else
 			printf("%s", out);
 		free(out);
 	} else if(strcmp(argv[1], "rlog") == 0){
 		printf("Resetting kernel log : \n");
 		printf("Restarting system log : \n");
-		rlog();
+		char *out = rlog();
+		if(out == NULL){
+			printf("Failed to reset kernel log\n");
+			return -1;
+		}
+
 	} else if(strcmp(argv[1],"version")==0)
 	{
 	;	

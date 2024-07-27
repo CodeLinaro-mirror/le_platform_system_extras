@@ -49,13 +49,13 @@ struct memory {
 	char *mem_kernel_usage;
 };
 
-void memdetail(struct memory *);
+char *memdetail(struct memory *);
 float cpudetail();
 char *starttime();
 char *logdetail();
 char *pscount();
 char *osdetail();
-void rlog(void);
+char *rlog(void);
 unsigned long long nand_info(void );
 
 #endif
