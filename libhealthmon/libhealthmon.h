@@ -28,7 +28,7 @@
 #define CMD_MEMMAPPED "grep 'Mapped' /proc/meminfo | awk '{print $2}'"
 
 #define CMD_NAND  "cat /proc/mtd"
-#define CMD_CPUDETAIL   "mpstat | tail -1 | awk '{print $12}'"
+#define CMD_CPUDETAIL   "mpstat | tail -1 | awk '{print $11}'"
 #define CMD_STIME    "uptime"
 #define CMD_PSCOUNT  "ps | wc -l"
 #define CMD_LOGDETAIL   "grep 'log_size' /etc/config/system"
