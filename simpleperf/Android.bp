@@ -138,6 +138,7 @@ cc_defaults {
         "libopencsd_decoder",
         "libz",
         "libziparchive",
+        "libzstd",
     ],
     target: {
         linux: {
@@ -182,6 +183,7 @@ cc_defaults {
         "libsimpleperf_etm_decoder",
         "libsimpleperf_regex",
         "libopencsd_decoder",
+        "libzstd",
     ],
     target: {
         linux: {
@@ -251,6 +253,7 @@ cc_defaults {
         "thread_tree.cpp",
         "tracing.cpp",
         "utils.cpp",
+        "ZstdUtil.cpp",
         ":simpleperf_event_table",
     ],
     target: {
@@ -599,6 +602,7 @@ cc_defaults {
         "test_util.cpp",
         "tracing_test.cpp",
         "utils_test.cpp",
+        "ZstdUtil_test.cpp",
     ],
     target: {
         android: {
