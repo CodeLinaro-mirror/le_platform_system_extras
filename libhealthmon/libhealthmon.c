@@ -6,71 +6,82 @@
  */
 
 #include "libhealthmon.h"
-void memdetail(struct memory *mem_detail) {
+char* memdetail(struct memory *mem_detail) {
 #if DEBUG
 	printf("\n*** Memory Details ***\n");
 #endif
 	size_t ret, len;
 	char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		return NULL;
+	}
 
 	memset(outbuff, '\0', BUFFLEN);
 	FILE *fp = popen(CMD_MEMTOTAL, "r");
-	if(fp == NULL)
+	if(fp == NULL){
 		perror("popen");
-
+		return NULL;
+		}
 	ret = fread(outbuff, BUFFLEN-1, 1, fp);
-	if(ret == -1)
+	if(ret == -1){
 		perror("fread");
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
+		return NULL;
+	}
 #if DEBUG
 	printf("%s", outbuff);
 #endif
-	strlcpy(mem_detail->mem_total, outbuff, len);
+	strlcpy(mem_detail->mem_total, outbuff, ret+1);
 	pclose(fp);
 	memset(outbuff, '\0', BUFFLEN);
 
         fp = popen(CMD_MEMFREE, "r");
-        if(fp == NULL)
+        if(fp == NULL){
                 perror("popen");
+		return NULL;
+		}
 
         ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
                 perror("fread");
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
+		return NULL;
+		}
 #if DEBUG
         printf("%s", outbuff);
 #endif
-	strlcpy(mem_detail->mem_free, outbuff, len);
+	strlcpy(mem_detail->mem_free, outbuff, ret+1);
         pclose(fp);
 
         memset(outbuff, '\0', BUFFLEN);
 
         fp = popen(CMD_MEMAVAL, "r");
-        if(fp == NULL)
+        if(fp == NULL){
                 perror("popen");
-
+		return NULL;
+		}
         ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
                 perror("fread");
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
+		return NULL;
+		}
 #if DEBUG
         printf("%s", outbuff);
 #endif
-	strlcpy(mem_detail->mem_aval, outbuff, len);
+	strlcpy(mem_detail->mem_aval, outbuff, ret+1);
         pclose(fp);
 
 	memset(outbuff, '\0', BUFFLEN);
 
         fp = popen(CMD_MEMCACHE, "r");
-        if(fp == NULL)
+        if(fp == NULL){
                 perror("popen");
-
+		return NULL;
+		}
         ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
                 perror("fread");
+		return NULL;
+		}
 	char *pos = strstr(outbuff, "SwapCached");
 	len = pos - outbuff;
 	outbuff[len] = '\0';
@@ -83,32 +94,36 @@ void memdetail(struct memory *mem_detail) {
 
 	memset(outbuff, '\0', BUFFLEN);
 	fp = popen(CMD_MEMANON, "r");
-	if(fp == NULL)
+	if(fp == NULL){
 		perror("popen");
+		return NULL;
+	}
 	ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
                 perror("fread");
-	len=strlen(outbuff);
-        outbuff[len] = '\0';
+		return NULL;
+		}
 #if DEBUG
         printf("%s",outbuff);
 #endif
-	strlcpy(mem_detail->mem_anon,outbuff, len);
+	strlcpy(mem_detail->mem_anon,outbuff, ret+1);
         pclose(fp);
 
 	memset(outbuff, '\0', BUFFLEN);
 	fp = popen (CMD_MEMMAPPED, "r");
-	if(fp == NULL)
+	if(fp == NULL){
 		perror("popen");
+		return NULL;
+	}
 	ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
 		perror("fread");
-	len=strlen(outbuff);
-    	outbuff[len] ='\0';
+		return NULL;
+		}
 #if DEBUG
     printf("%s",outbuff);
 #endif
-        strlcpy(mem_detail->mem_mapp, outbuff, len);
+        strlcpy(mem_detail->mem_mapp, outbuff, ret+1);
 	pclose(fp);
 	free(outbuff);
 
@@ -140,18 +155,24 @@ float cpudetail() {
 	printf("*** CPU usage detail\n");
 #endif
 
-		int ret,len=0;
-       float cpu_usage;
+		int ret;
+       float cpu_usage = -1.0f;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
-		memset(outbuff, '0',BUFFLEN);
+	if(outbuff == NULL){
+		perror("Memory allocation failed\n");
+		return cpu_usage;
+	}
+		memset(outbuff, '\0',BUFFLEN);
         FILE *fp = popen(CMD_CPUDETAIL, "r");
-        if(fp == NULL)
+        if(fp == NULL){
                 perror("popen");
+		return cpu_usage;
+		}
 	ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+        if(ret == -1){
             perror("fread");
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
+		return cpu_usage;
+		}
 	cpu_usage = 100-(atof(outbuff));
 #if DEBUG
         printf("%.2f", cpu_usage);
@@ -166,20 +187,23 @@ char *starttime() {
 	printf("\n*** System start time ***\n");
 #endif
 
-	int ret, len=0;
+	int ret;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		return NULL;
+	}
 		memset(outbuff, '\0', BUFFLEN);
         FILE *fp = popen(CMD_STIME, "r");
         if(fp == NULL){
                 perror("popen");
 		exit(EXIT_FAILURE);
         }
-
-        ret = fread(outbuff, BUFFLEN-1, 1, fp);
-        if(ret == -1)
+	ret = fread(outbuff, BUFFLEN-1, 1, fp);
+        if(ret == -1){
                 perror("fread");
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
+		return NULL;
+		}
 #if DEBUG
         printf("%s", outbuff);
 #endif
@@ -192,22 +216,23 @@ char *pscount() {
 	printf("\n*** Process count ***\n");
 #endif
 
-	int ret, len=0;
+	int ret;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		return NULL;
+	}
 		memset(outbuff, '\0', BUFFLEN);
         FILE *fp = popen(CMD_PSCOUNT, "r");
         if(fp == NULL){
                 perror("popen");
 		exit(EXIT_FAILURE);
         }
-
         ret = fread(outbuff, BUFFLEN-1, 1, fp);
         if(ret == -1){
                 perror("fread");
 		exit(EXIT_FAILURE);
         }
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
 #if DEBUG
         printf("%s", outbuff);
 #endif
@@ -220,22 +245,23 @@ char *logdetail() {
 	printf("\n *** Log detail ***\n");
 #endif
 	
-	int ret, len=0;
+	int ret;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
-		memset(outbuff, '\0', BUFFLEN);
+	if(outbuff == NULL) {
+		perror("memory allocation failed\n");
+		return NULL;
+	}
+	memset(outbuff, '\0', BUFFLEN);
         FILE *fp = popen(CMD_LOGDETAIL, "r");
         if(fp == NULL){
                 perror("popen");
 		exit(EXIT_FAILURE);
         }
-
-        ret = fread(outbuff, BUFFLEN-1, 1, fp);
+	ret = fread(outbuff, BUFFLEN-1, 1, fp);
         if(ret == -1){
                 perror("fread");
 		exit(EXIT_FAILURE);
         }
-	len = strlen(outbuff);
-	outbuff[len] = '\0';
 #if DEBUG
         printf("%s", outbuff);
 #endif
@@ -251,6 +277,10 @@ char *osdetail() {
       char *line = NULL;
 	  size_t str_len =0;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		return NULL;
+	}
 		memset(outbuff, '\0', BUFFLEN);
         FILE *fp = popen(CMD_OSDETAIL, "r");
         if(fp == NULL){
@@ -273,12 +303,16 @@ char *osdetail() {
 	return outbuff;
 }
 
-void rlog(void) {
+char* rlog(void) {
 #if DEBUG
 	printf("\n*** Resetting kernel log ***\n");
 #endif
 	int ret;
 	char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		return NULL;
+	}
 	memset(outbuff, '\0', BUFFLEN);
 
 	FILE *fp = popen(CMD_RLOG, "r");
@@ -298,6 +332,7 @@ void rlog(void) {
                 perror("popen");
 		exit(EXIT_FAILURE);
         }
+	
 	ret = fread(outbuff, BUFFLEN, 1, fp);
         if(ret == -1)
                 perror("fread");
@@ -309,6 +344,10 @@ void rlog(void) {
 unsigned long long nand_info(){
 	unsigned long long tsize = 0;
         char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
+	if(outbuff == NULL) {
+		perror("Memory allocation failed\n");
+		exit(EXIT_FAILURE);
+	}
         memset(outbuff, '\0', BUFFLEN);
         FILE *fp = popen(CMD_NAND, "r");
 	if(fp == NULL){
