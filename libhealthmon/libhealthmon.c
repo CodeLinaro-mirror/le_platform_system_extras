@@ -10,7 +10,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
 	printf("\n*** Memory Details ***\n");
 #endif
-	size_t ret, len=0;
+	size_t ret, len;
 	char *outbuff = (char*)malloc(sizeof(char)*BUFFLEN);
 	if(outbuff == NULL) {
 		perror("Memory allocation failed\n");
@@ -31,8 +31,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
 	printf("%s", outbuff);
 #endif
-	len = strlen(outbuff);
-	strlcpy(mem_detail->mem_total, outbuff, len);
+	strlcpy(mem_detail->mem_total, outbuff, ret+1);
 	pclose(fp);
 	memset(outbuff, '\0', BUFFLEN);
 
@@ -50,8 +49,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
         printf("%s", outbuff);
 #endif
-	len = strlen(outbuff);
-	strlcpy(mem_detail->mem_free, outbuff, len);
+	strlcpy(mem_detail->mem_free, outbuff, ret+1);
         pclose(fp);
 
         memset(outbuff, '\0', BUFFLEN);
@@ -69,8 +67,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
         printf("%s", outbuff);
 #endif
-	len = strlen(outbuff);
-	strlcpy(mem_detail->mem_aval, outbuff, len);
+	strlcpy(mem_detail->mem_aval, outbuff, ret+1);
         pclose(fp);
 
 	memset(outbuff, '\0', BUFFLEN);
@@ -92,7 +89,6 @@ char* memdetail(struct memory *mem_detail) {
         printf("%s", outbuff);
 #endif
 
-	len = strlen(outbuff);
 	strlcpy(mem_detail->mem_cache, outbuff, len);
         pclose(fp);
 
@@ -110,8 +106,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
         printf("%s",outbuff);
 #endif
-	len = strlen(outbuff);
-	strlcpy(mem_detail->mem_anon,outbuff, len);
+	strlcpy(mem_detail->mem_anon,outbuff, ret+1);
         pclose(fp);
 
 	memset(outbuff, '\0', BUFFLEN);
@@ -128,8 +123,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
     printf("%s",outbuff);
 #endif
-	len = strlen(outbuff);
-        strlcpy(mem_detail->mem_mapp, outbuff, len);
+        strlcpy(mem_detail->mem_mapp, outbuff, ret+1);
 	pclose(fp);
 	free(outbuff);
 
@@ -139,12 +133,12 @@ char* memdetail(struct memory *mem_detail) {
 
 	len=strlen(mem_detail->mem_apps_usage);
 	mem_detail->mem_apps_usage[len]='\0';
-
+	
 	total_kernel = (atoi (mem_detail->mem_total)) -((atoi (mem_detail->mem_free)) +total_apps);
 	snprintf(mem_detail->mem_kernel_usage, sizeof(mem_detail->mem_kernel_usage), "%lu", total_kernel);
 	len=strlen(mem_detail->mem_kernel_usage);
         mem_detail->mem_kernel_usage[len]='\0';
-
+    
 
 #if DEBUG
 	printf("Total Apps : %s",mem_detail->mem_apps_usage);
@@ -153,7 +147,7 @@ char* memdetail(struct memory *mem_detail) {
 #if DEBUG
         printf("Total kernel : %s",mem_detail->mem_kernel_usage);
 #endif
-	return "Success";
+	
 }
 
 float cpudetail() {
@@ -344,7 +338,7 @@ char* rlog(void) {
                 perror("fread");
 	pclose(fp);
 	free(outbuff);
-	return "Success";
+
 }
 
 unsigned long long nand_info(){
