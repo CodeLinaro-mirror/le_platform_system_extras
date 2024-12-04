@@ -72,6 +72,9 @@ cc_defaults {
             cflags: ["-DNO_LIBDEXFILE_SUPPORT"],
             local_include_dirs: ["nonlinux_support/include"],
         },
+        android: {
+            compile_multilib: "both",
+        },
     },
 }
 
@@ -164,7 +167,7 @@ cc_defaults {
     name: "simpleperf_shared_libs",
     defaults: [
         "simpleperf_cflags",
-	"libsimpleperf_readelf_defaults",
+        "libsimpleperf_readelf_defaults",
     ],
     host_supported: true,
     shared_libs: [
@@ -186,7 +189,6 @@ cc_defaults {
             shared_libs: [
                 "libcutils",
                 "libevent",
-                "liblog",
                 "libprocinfo",
                 "libunwindstack",
             ],
@@ -380,19 +382,17 @@ cc_binary {
     dist: {
         targets: ["simpleperf"],
     },
+    multilib: {
+        lib32: {
+            suffix: "32",
+        },
+    },
     srcs: [
         "main.cpp",
     ],
     static_libs: [
         "libsimpleperf",
     ],
-
-    compile_multilib: "both",
-    multilib: {
-        lib64: {
-            suffix: "64",
-        },
-    },
 
     target: {
         android: {
@@ -420,6 +420,9 @@ cc_binary {
             dist: {
                 dir: "simpleperf/android/x86_64",
             },
+        },
+        host: {
+            stem: "simpleperf",
         },
         darwin: {
             dist: {
@@ -497,7 +500,6 @@ cc_library {
             static_libs: ["libdexfile_static"],
         },
     },
-    sdclang: false,
 }
 
 // It's the shared library used on host by python scripts to report samples in different ways.
