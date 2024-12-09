@@ -28,7 +28,7 @@
 #define CMD_MEMMAPPED "grep 'Mapped' /proc/meminfo | awk '{print $2}'"
 
 #define CMD_NAND  "cat /proc/mtd"
-#define CMD_CPUDETAIL   "mpstat | tail -1 | awk '{print $12}'"
+#define CMD_CPUDETAIL   "mpstat | tail -1 | awk '{print $11}'"
 #define CMD_STIME    "uptime"
 #define CMD_PSCOUNT  "ps | wc -l"
 #define CMD_LOGDETAIL   "grep 'log_size' /etc/config/system"
@@ -49,13 +49,13 @@ struct memory {
 	char *mem_kernel_usage;
 };
 
-void memdetail(struct memory *);
+char *memdetail(struct memory *);
 float cpudetail();
 char *starttime();
 char *logdetail();
 char *pscount();
 char *osdetail();
-void rlog(void);
+char *rlog(void);
 unsigned long long nand_info(void );
 
 #endif
