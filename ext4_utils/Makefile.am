@@ -28,7 +28,7 @@ libext4_utils_la_LDFLAGS  += -lcutils -lsparse
 
 if SELINUX_ENABLE
 libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
-libext4_utils_la_LDFLAG = -lselinux
+libext4_utils_la_LDFLAGS += -lselinux
 libext4_utils_la_CFLAGS = -DSELINUX_IS_ENABLE
 endif
 endif
@@ -44,7 +44,7 @@ libext4_utils_la_LDFLAGS  += -lcutils -lsparse
 
 if SELINUX_ENABLE
 libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
-libext4_utils_la_LDFLAG = -lselinux
+libext4_utils_la_LDFLAGS += -lselinux
 libext4_utils_la_CFLAGS = -DSELINUX_IS_ENABLE
 endif
 
