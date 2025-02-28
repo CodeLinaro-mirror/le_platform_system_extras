@@ -29,7 +29,7 @@ libext4_utils_la_LDFLAGS  += -lcutils -lsparse
 if SELINUX_ENABLE
 libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
 libext4_utils_la_LDFLAGS += -lselinux
-libext4_utils_la_CFLAGS = -DSELINUX_IS_ENABLE
+libext4_utils_la_CPPFLAGS += -DSELINUX_IS_ENABLE
 endif
 endif
 
@@ -45,7 +45,7 @@ libext4_utils_la_LDFLAGS  += -lcutils -lsparse
 if SELINUX_ENABLE
 libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
 libext4_utils_la_LDFLAGS += -lselinux
-libext4_utils_la_CFLAGS = -DSELINUX_IS_ENABLE
+libext4_utils_la_CPPFLAGS += -DSELINUX_IS_ENABLE
 endif
 
 ### Build make_ext4fs ext2simg binary
@@ -57,6 +57,9 @@ make_ext4fs_CFLAGS  += -DANDROID
 make_ext4fs_CFLAGS  += -DHOST
 make_ext4fs_LDADD    = libext4_utils.la
 make_ext4fs_LDADD   += -lcutils -lsparse
+if SELINUX_ENABLE
+make_ext4fs_CFLAGS  += -DSELINUX_IS_ENABLE
+endif
 
 ext2simg_SOURCES  = ext2simg.c
 ext2simg_CFLAGS   = $(AM_CFLAGS)
