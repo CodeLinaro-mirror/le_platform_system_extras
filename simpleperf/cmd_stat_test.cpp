@@ -378,6 +378,14 @@ TEST(stat_cmd, per_thread_option) {
 }
 
 // @CddTest = 6.1/C-0-2
+TEST(stat_cmd, monitor_new_thread_option) {
+  ASSERT_TRUE(
+      StatCmd()->Run({"--per-thread", "--monitor-new-thread", "--no-inherit", "sleep", "0.1"}));
+  TEST_IN_ROOT(StatCmd()->Run(
+      {"--per-thread", "--monitor-new-thread", "--no-inherit", "-a", "--duration", "0.1"}));
+}
+
+// @CddTest = 6.1/C-0-2
 TEST(stat_cmd, per_core_option) {
   ASSERT_TRUE(StatCmd()->Run({"--per-core", "sleep", "0.1"}));
   TEST_IN_ROOT(StatCmd()->Run({"--per-core", "-a", "--duration", "0.1"}));
@@ -450,7 +458,7 @@ TEST(stat_cmd, kprobe_option) {
   TEST_REQUIRE_ROOT();
   EventSelectionSet event_selection_set(false);
   ProbeEvents probe_events(event_selection_set);
-  if (!probe_events.IsKprobeSupported()) {
+  if (!probe_events.IsProbeSupported(ProbeEventType::kKprobe)) {
     GTEST_LOG_(INFO) << "Skip this test as kprobe isn't supported by the kernel.";
     return;
   }
@@ -459,6 +467,31 @@ TEST(stat_cmd, kprobe_option) {
   // A default kprobe event is created if not given an explicit --kprobe option.
   ASSERT_TRUE(StatCmd()->Run({"-e", "kprobes:do_sys_openat2", "-a", "--duration", SLEEP_SEC}));
   ASSERT_TRUE(StatCmd()->Run({"--group", "kprobes:do_sys_openat2", "-a", "--duration", SLEEP_SEC}));
+}
+
+// @CddTest = 6.1/C-0-2
+TEST(stat_cmd, uprobe_option) {
+  TEST_REQUIRE_ROOT();
+  EventSelectionSet event_selection_set(false);
+  ProbeEvents probe_events(event_selection_set);
+  if (!probe_events.IsProbeSupported(ProbeEventType::kUprobe)) {
+    GTEST_LOG_(INFO) << "Skip this test as uprobe isn't supported by the kernel.";
+    return;
+  }
+  if (!IsRegularFile("/system/lib64/libc.so")) {
+    GTEST_LOG_(INFO) << "Skip this test as /system/lib64/libc.so doesn't exist";
+    return;
+  }
+  ASSERT_TRUE(
+      StatCmd()->Run({"-e", "uprobes:myprobe", "--uprobe",
+                      "p:myprobe /system/lib64/libc.so:0x88e80", "-a", "--duration", SLEEP_SEC}));
+  ASSERT_TRUE(StatCmd()->Run({"-e", "uprobes:p_libc_0x88e80", "--uprobe",
+                              "p /system/lib64/libc.so:0x88e80", "-a", "--duration", SLEEP_SEC}));
+  ASSERT_TRUE(
+      StatCmd()->Run({"-e", "uprobes:myprobe", "--uprobe",
+                      "r:myprobe /system/lib64/libc.so:0x88e80", "-a", "--duration", SLEEP_SEC}));
+  ASSERT_TRUE(StatCmd()->Run({"-e", "uprobes:p_libc_0x88e80", "--uprobe",
+                              "r /system/lib64/libc.so:0x88e80", "-a", "--duration", SLEEP_SEC}));
 }
 
 // @CddTest = 6.1/C-0-2
