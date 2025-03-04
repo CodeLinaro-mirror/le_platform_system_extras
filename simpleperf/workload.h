@@ -47,7 +47,6 @@ class Workload {
   bool Start();
   bool IsStarted() { return work_state_ == Started; }
   pid_t GetPid() { return work_pid_; }
-  std::string GetCommandName();
 
   bool WaitChildProcess(bool wait_forever, int* exit_code);
 

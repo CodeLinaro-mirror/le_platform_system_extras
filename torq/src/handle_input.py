@@ -35,9 +35,9 @@ class HandleInput:
   def handle_input(self):
     i = 0
     while i < self.max_attempts:
-      response = input(self.input_msg).lower()
+      response = input(self.input_msg)
 
-      if response in self.choices:
+      if response.lower() in self.choices:
         return self.choices[response]()
 
       i += 1

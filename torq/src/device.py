@@ -17,9 +17,8 @@
 import math
 import os
 import subprocess
-import sys
 import time
-from .handle_input import HandleInput
+
 from .validation_error import ValidationError
 
 ADB_ROOT_TIMED_OUT_LIMIT_SECS = 5
@@ -73,29 +72,11 @@ class AdbDevice:
     elif len(devices) == 1:
       self.serial = devices[0]
     else:
-      options = ""
-      choices = {}
-      for i, device in enumerate(devices):
-        options += ("%d: torq --serial %s %s\n\t"
-                    % (i, device, " ".join(sys.argv[1:])))
-        # Lambdas are bound to local scope, so assign var d to prevent
-        # future values of device from overriding the current value we want
-        choices[str(i)] = lambda d=device: d
-      # Remove last \t
-      options = options[:-1]
-      chosen_serial = (HandleInput("There is more than one device currently "
-                                  "connected. Press the corresponding number "
-                                  "for the following options to choose the "
-                                  "device you want to use.\n\t%sSelect "
-                                  "device[0-%d]: "
-                                  % (options, len(devices) - 1),
-                                  "Please select a valid option.",
-                                  choices)
-                       .handle_input())
-      if isinstance(chosen_serial, ValidationError):
-        return chosen_serial
-      print("Using device with serial %s" % chosen_serial)
-      self.serial = chosen_serial
+      return ValidationError(("There is more than one device currently"
+                              " connected."),
+                             ("Run one of the following commands to choose one"
+                              " of the connected devices:\n\t torq --serial %s"
+                              % "\n\t torq --serial ".join(devices)))
     return None
 
   @staticmethod
@@ -251,9 +232,6 @@ class AdbDevice:
                             capture_output=True)
 
     if output is None or len(output.stdout) == 0:
-      if "not found" in output.stderr.decode("utf-8"):
-        return ValidationError("Simpleperf was not found in the device",
-                               "Push the simpleperf binary to the device")
       raise Exception("Error while validating simpleperf events.")
     lines = output.stdout.decode("utf-8").split("\n")
 
