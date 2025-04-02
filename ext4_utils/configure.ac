@@ -25,6 +25,12 @@ AC_PROG_MAKE_SET
 # Build all components by default
 # To add new components: add AC_ARG_ENABLE, AM_CONDITIONAL and update AC_OUTPUT
 
+AC_ARG_ENABLE(selinux,
+      AC_HELP_STRING([--enable-selinux], [DISTRO enable selinux feature.]),
+      [selinux_enable=${enableval}], [selinux_enable="no"])
+
+AM_CONDITIONAL(SELINUX_ENABLE, [test "x${selinux_enable}" = "xyes"])
+
 PKG_CHECK_MODULES([LIBSPARSE], [libsparse])
 AC_SUBST([LIBSPARSE_CFLAGS])
 AC_SUBST([LIBSPARSE_LIBS])
