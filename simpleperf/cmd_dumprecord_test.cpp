@@ -85,6 +85,12 @@ TEST(cmd_dump, etm_data) {
   ASSERT_NE(data.find("OCSD_GEN_TRC_ELEM_INSTR_RANGE"), std::string::npos);
 }
 
+TEST(cmd_dump, etm_data_wrong_aux) {
+  // A malformed perf.data where an aux record's offset was changed to
+  // point outside the file.
+  ASSERT_TRUE(DumpCmd()->Run({GetTestData("etm/perf_etm_wrong_aux.data")}));
+}
+
 // @CddTest = 6.1/C-0-2
 TEST(cmd_dump, dump_arm_regs_recorded_in_arm64) {
   ASSERT_TRUE(DumpCmd()->Run({GetTestData("perf_with_arm_regs.data")}));
