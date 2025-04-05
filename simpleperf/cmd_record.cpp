@@ -593,6 +593,10 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
         LOG(INFO) << "Hardware events are not available, switch to cpu-clock.";
       }
     }
+    if (!IsKernelEventSupported()) {
+      event_type += ":u";
+      LOG(INFO) << "Can't record kernel samples, switch to " << event_type;
+    }
     if (!event_selection_set_.AddEventType(event_type)) {
       return false;
     }
