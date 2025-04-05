@@ -866,7 +866,8 @@ bool RecordFileReader::ReadAuxData(uint32_t cpu, uint64_t aux_offset, size_t siz
       location = &*location_it;
     }
   }
-  if (location == nullptr) {
+  if (location == nullptr || location->aux_offset > aux_offset ||
+      location->aux_offset + location->aux_size < aux_offset + size) {
     // ETM data can be dropped when recording if the userspace buffer is full. This isn't an error.
     LOG(INFO) << "aux data is missing: cpu " << cpu << ", aux_offset " << aux_offset << ", size "
               << size << ". Probably the data is lost when recording.";
