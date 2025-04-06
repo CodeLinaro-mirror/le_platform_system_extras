@@ -14,6 +14,7 @@
 # limitations under the License.
 #
 
+import builtins
 import unittest
 import os
 import subprocess
@@ -244,8 +245,10 @@ class DeviceUnitTest(unittest.TestCase):
 
   @mock.patch.dict(os.environ, {}, clear=True)
   @mock.patch.object(subprocess, "run", autospec=True)
-  def test_check_device_connection_multiple_devices_error(self,
+  @mock.patch.object(builtins, "input")
+  def test_check_device_connection_multiple_devices_select_first(self, mock_input,
       mock_subprocess_run):
+    mock_input.return_value = "0"
     mock_subprocess_run.return_value = (
         self.generate_adb_devices_result([TEST_DEVICE_SERIAL,
                                           TEST_DEVICE_SERIAL2]))
@@ -253,15 +256,24 @@ class DeviceUnitTest(unittest.TestCase):
 
     error = adbDevice.check_device_connection()
 
-    self.assertNotEqual(error, None)
-    self.assertEqual(error.message, ("There is more than one device currently"
-                                     " connected."))
-    self.assertEqual(error.suggestion, ("Run one of the following commands to"
-                                        " choose one of the connected devices:"
-                                        "\n\t torq --serial %s"
-                                        "\n\t torq --serial %s"
-                                        % (TEST_DEVICE_SERIAL,
-                                           TEST_DEVICE_SERIAL2)))
+    self.assertEqual(error, None)
+    self.assertEqual(adbDevice.serial, TEST_DEVICE_SERIAL)
+
+  @mock.patch.dict(os.environ, {}, clear=True)
+  @mock.patch.object(subprocess, "run", autospec=True)
+  @mock.patch.object(builtins, "input")
+  def test_check_device_connection_multiple_devices_select_second(self, mock_input,
+      mock_subprocess_run):
+    mock_input.return_value = "1"
+    mock_subprocess_run.return_value = (
+        self.generate_adb_devices_result([TEST_DEVICE_SERIAL,
+                                          TEST_DEVICE_SERIAL2]))
+    adbDevice = AdbDevice(None)
+
+    error = adbDevice.check_device_connection()
+
+    self.assertEqual(error, None)
+    self.assertEqual(adbDevice.serial, TEST_DEVICE_SERIAL2)
 
   @mock.patch.object(subprocess, "run", autospec=True)
   def test_root_device_success(self, mock_subprocess_run):
@@ -857,6 +869,20 @@ class DeviceUnitTest(unittest.TestCase):
     self.assertEqual(error.suggestion, "Run adb shell simpleperf list to"
                                        " see valid simpleperf events.")
 
+  @mock.patch.object(subprocess, "run", autospec=True)
+  def test_simpleperf_not_installed(self, mock_subprocess_run):
+    mock_subprocess_run.return_value = (
+        self.generate_mock_completed_process(
+            b'',
+            b'/system/bin/sh: simpleperf: inaccessible or not found\n')
+    )
+    adbDevice = AdbDevice(TEST_DEVICE_SERIAL)
+
+    error = adbDevice.simpleperf_event_exists(["cpu-clock", "minor-faults",
+                                               "List"])
+
+    self.assertEqual(error.message, "Simpleperf was not found in the device")
+    self.assertEqual(error.suggestion, "Push the simpleperf binary to the device")
 
 if __name__ == '__main__':
   unittest.main()
