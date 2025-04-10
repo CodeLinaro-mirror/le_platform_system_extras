@@ -402,7 +402,7 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
           success = false;
           break;
         }
-        if (IsEtmEventType(fd->attr().type)) {
+        if (IsEtmEventName(fd->EventName())) {
           if (!fd->CreateAuxBuffer(aux_buffer_size_, report_error)) {
             fd->DestroyMappedBuffer();
             success = false;
