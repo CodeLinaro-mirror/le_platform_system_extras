@@ -29,7 +29,9 @@
 
 namespace simpleperf {
 
-inline const std::string kETMEventName = "cs-etm";
+static inline bool IsEtmEventName(const std::string& name) {
+  return name.find("cs-etm") != std::string::npos;
+}
 
 // EventType represents one type of event, like cpu_cycle_event, cache_misses_event.
 // The user knows one event type by its name, and the kernel knows one event type by its
@@ -51,8 +53,8 @@ struct EventType {
     return strcasecmp(name.c_str(), other.name.c_str()) < 0;
   }
 
-  bool IsPmuEvent() const { return name.find('/') != std::string::npos; }
-  bool IsEtmEvent() const { return name == kETMEventName; }
+  bool IsPmuEvent() const { return name.find('/') != std::string::npos && !IsEtmEvent(); }
+  bool IsEtmEvent() const { return IsEtmEventName(name); }
   bool IsHardwareEvent() const {
     return type == PERF_TYPE_HARDWARE || type == PERF_TYPE_HW_CACHE || type == PERF_TYPE_RAW;
   }
@@ -132,7 +134,6 @@ class EventTypeManager {
 
 const EventType* FindEventTypeByName(const std::string& name, bool report_error = true);
 std::unique_ptr<EventTypeAndModifier> ParseEventType(const std::string& event_type_str);
-bool IsEtmEventType(uint32_t type);
 
 }  // namespace simpleperf
 
