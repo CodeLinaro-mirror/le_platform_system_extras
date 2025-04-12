@@ -57,10 +57,12 @@ class ETMRecorder {
 
   // If not found, return -1.
   int GetEtmEventType();
-  std::unique_ptr<EventType> BuildEventType();
+  void BuildEventTypes(std::set<EventType>& event_types);
   bool IsETMDriverAvailable();
-  android::base::expected<bool, std::string> CheckEtmSupport();
-  void SetEtmPerfEventAttr(perf_event_attr* attr);
+  // If need_etr is true, then return true only if ETR is ready.
+  // Otherwise, return true if either ETR or TRBE is ready.
+  android::base::expected<bool, std::string> CheckEtmSupport(bool need_etr = true);
+  void SetEtmPerfEventAttr(const EventType& event_type, perf_event_attr& attr);
   AuxTraceInfoRecord CreateAuxTraceInfoRecord();
   size_t GetAddrFilterPairs();
   void SetRecordTimestamp(bool record);
@@ -69,13 +71,16 @@ class ETMRecorder {
 
  private:
   bool ReadEtmInfo();
-  bool FindSinkConfig();
+  bool CheckSinkSupport();
   void BuildEtmConfig();
 
   int event_type_ = 0;
   bool etm_supported_ = false;
+  bool has_etr_sink = false;
+  bool has_trbe_sink = false;
   // select ETR device, setting in perf_event_attr->config2
-  uint32_t sink_config_ = 0;
+  uint32_t etr_sink_config_ = 0;
+  std::vector<int> trbe_supported_cpus_;
   // use EL2 PID tracing or not
   bool use_contextid2_ = false;
   // select etm options (timestamp, context_id, ...), setting in perf_event_attr->config
