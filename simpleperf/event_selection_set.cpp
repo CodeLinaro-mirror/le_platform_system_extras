@@ -272,6 +272,14 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
     // PMU events are provided by kernel, so they should be supported
     if (!event_type->event_type.IsPmuEvent() &&
         !IsEventAttrSupported(selection->event_attr, selection->event_type_modifier.name)) {
+      if (selection->event_attr.exclude_kernel == 0) {
+        selection->event_attr.exclude_kernel = 1;
+        if (IsEventAttrSupported(selection->event_attr, selection->event_type_modifier.name)) {
+          LOG(ERROR) << "Can't record kernel samples. Please try `-e " << event_type->name
+                     << ":u` instead.";
+          return false;
+        }
+      }
       LOG(ERROR) << "Event type '" << event_type->name << "' is not supported on the device";
       return false;
     }
