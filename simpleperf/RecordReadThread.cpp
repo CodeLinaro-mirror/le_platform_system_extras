@@ -375,9 +375,8 @@ bool RecordReadThread::HandleCmd(IOEventLoop& loop) {
       break;
     case CMD_SYNC_KERNEL_BUFFER:
       if (has_etm_events_) {
-        result = FlushETMData();
-      }
-      if (result) {
+        result = ReadETMData();
+      } else {
         result = ReadRecordsFromKernelBuffer();
       }
       break;
@@ -442,15 +441,20 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
     return false;
   }
   for (auto& pair : cpu_map) {
-    if (!pair.second->StartPolling(loop, [this]() { return ReadRecordsFromKernelBuffer(); })) {
-      return false;
-    }
     kernel_record_readers_.emplace_back(pair.second);
   }
   if (has_etm_events_) {
+    // To prevent ETM data flooding from TRBE, read ETM data periodically instead of polling.
     if (!loop.AddPeriodicEvent(SecondToTimeval(etm_flush_interval_.count() / 1000.0),
-                               [this]() { return FlushETMData(); })) {
+                               [this]() { return ReadETMData(); })) {
       return false;
+    }
+  } else {
+    for (auto& reader : kernel_record_readers_) {
+      if (!reader.GetEventFd()->StartPolling(loop,
+                                             [this]() { return ReadRecordsFromKernelBuffer(); })) {
+        return false;
+      }
     }
   }
   return true;
@@ -499,8 +503,8 @@ bool RecordReadThread::ReadRecordsFromKernelBuffer() {
       } else {
         // Use a binary heap to merge records from different buffers. As records from the same
         // buffer are already ordered by time, we only need to merge the first record from all
-        // buffers. And each time a record is popped from the heap, we put the next record from its
-        // buffer into the heap.
+        // buffers. And each time a record is popped from the heap, we put the next record from
+        // its buffer into the heap.
         for (auto& reader : readers) {
           reader->MoveToNextRecord(record_parser_);
         }
@@ -532,7 +536,8 @@ bool RecordReadThread::ReadRecordsFromKernelBuffer() {
       return false;
     }
     // If there are no commands, we can loop until there is no more data from the kernel.
-  } while (GetCmd() == NO_CMD);
+    // To prevent ETM data flooding from TRBE, avoid reading ETM data in a loop.
+  } while (GetCmd() == NO_CMD && !has_etm_events_);
   return true;
 }
 
@@ -698,14 +703,14 @@ bool RecordReadThread::SendDataNotificationToMainThread() {
   return true;
 }
 
-bool RecordReadThread::FlushETMData() {
+bool RecordReadThread::ReadETMData() {
   if (!etm_with_etr_fds_.empty()) {
     // For ETM events using ETR as the sink:
     // ETM data is dumped to kernel buffer only when there is no thread traced by ETM. It happens
     // either when all monitored threads are scheduled off cpu, or when all ETM perf events are
-    // disabled. If ETM data isn't dumped to kernel buffer in time, overflow parts will be dropped.
-    // This makes less than expected data, especially in system wide recording. So add a periodic
-    // event to flush ETM data by temporarily disabling all perf events.
+    // disabled. If ETM data isn't dumped to kernel buffer in time, overflow parts will be
+    // dropped. This makes less than expected data, especially in system wide recording. So flush
+    // ETM data by temporarily disabling all perf events.
     EventFd* last_fd = nullptr;
     for (size_t i = 0; i < etm_with_etr_fds_.size(); i++) {
       if (i == last_to_disable_etm_index_) {
@@ -731,7 +736,7 @@ bool RecordReadThread::FlushETMData() {
       }
     }
   }
-  return true;
+  return ReadRecordsFromKernelBuffer();
 }
 
 }  // namespace simpleperf

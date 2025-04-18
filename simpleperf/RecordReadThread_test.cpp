@@ -530,7 +530,6 @@ TEST_F(RecordReadThreadTest, read_aux_data) {
   MockEventFd fd(attr, 0, nullptr, 1, true, "cs-etm");
   EXPECT_CALL(fd, CreateMappedBuffer(_, _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, CreateAuxBuffer(Eq(AUX_BUFFER_SIZE), _)).Times(1).WillOnce(Return(true));
-  EXPECT_CALL(fd, StartPolling(_, _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, SetEnableEvent(_)).Times(AnyNumber()).WillRepeatedly(Return(true));
   EXPECT_CALL(fd, GetAvailableMmapDataSize(_)).Times(aux_data.size()).WillRepeatedly(Return(0));
   EXPECT_CALL(fd,

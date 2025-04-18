@@ -184,7 +184,7 @@ class RecordReadThread {
   void PushRecordToRecordBuffer(KernelRecordReader* kernel_record_reader);
   void ReadAuxDataFromKernelBuffer(bool* has_data);
   bool SendDataNotificationToMainThread();
-  bool FlushETMData();
+  bool ReadETMData();
 
   RecordBuffer record_buffer_;
   // When free size in record buffer is below low level, we cut stack data of sample records to 1K.
