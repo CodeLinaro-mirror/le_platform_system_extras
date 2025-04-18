@@ -1107,6 +1107,8 @@ TEST(record_cmd, cs_etm_event) {
   ASSERT_TRUE(has_auxtrace);
   ASSERT_TRUE(has_aux);
   ASSERT_TRUE(!reader->ReadBuildIdFeature().empty());
+  // Reset reader to avoid interfering with next event type detection for cs-etm/@tmc_etr0/.
+  reader.reset();
 
   // We can explicitly use ETR. Because ETR is ready after CheckEtmSupport().
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm/@tmc_etr0/"}, tmpfile.path));
@@ -1179,7 +1181,9 @@ TEST(record_cmd, addr_filter_option) {
       CreateCommandInstance("inject")->Run({"-i", record_file.path, "-o", inject_file.path}));
   std::string data;
   ASSERT_TRUE(android::base::ReadFileToString(inject_file.path, &data));
-  // Only instructions in sleep_exec_path are traced.
+  // Trace should ideally be limited to sleep_exec_path. However, due to potential early child
+  // command execution before filter setup, some other binary ETM data might exist. Thus, only
+  // checking for the presence of sleep_exec_path traces.
   bool seen_sleep = false;
   for (auto& line : android::base::Split(data, "\n")) {
     if (android::base::StartsWith(line, "// ")) {
@@ -1187,8 +1191,9 @@ TEST(record_cmd, addr_filter_option) {
         continue;
       }
       std::string dso = line.substr(strlen("// "), sleep_exec_path.size());
-      ASSERT_EQ(dso, sleep_exec_path);
-      seen_sleep = true;
+      if (dso == sleep_exec_path) {
+        seen_sleep = true;
+      }
     }
   }
   ASSERT_TRUE(seen_sleep);
