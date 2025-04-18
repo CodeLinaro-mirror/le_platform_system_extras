@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "ETMRecorder.h"
 #include "environment.h"
 #include "event_type.h"
 #include "record.h"
@@ -415,7 +416,9 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
             break;
           }
           has_etm_events_ = true;
-          etm_event_fds_.push_back(fd);
+          if (!ETMRecorder::GetInstance().IsUsingTRBE(fd->attr(), fd->Cpu())) {
+            etm_with_etr_fds_.push_back(fd);
+          }
         }
         cpu_map[fd->Cpu()] = fd;
       } else {
@@ -696,34 +699,36 @@ bool RecordReadThread::SendDataNotificationToMainThread() {
 }
 
 bool RecordReadThread::FlushETMData() {
-  // For ETM events using ETR as the sink:
-  // ETM data is dumped to kernel buffer only when there is no thread traced by ETM. It happens
-  // either when all monitored threads are scheduled off cpu, or when all ETM perf events are
-  // disabled. If ETM data isn't dumped to kernel buffer in time, overflow parts will be dropped.
-  // This makes less than expected data, especially in system wide recording. So add a periodic
-  // event to flush ETM data by temporarily disabling all perf events.
-  EventFd* last_fd = nullptr;
-  for (size_t i = 0; i < etm_event_fds_.size(); i++) {
-    if (i == last_to_disable_etm_index_) {
-      last_fd = etm_event_fds_[i];
-      continue;
+  if (!etm_with_etr_fds_.empty()) {
+    // For ETM events using ETR as the sink:
+    // ETM data is dumped to kernel buffer only when there is no thread traced by ETM. It happens
+    // either when all monitored threads are scheduled off cpu, or when all ETM perf events are
+    // disabled. If ETM data isn't dumped to kernel buffer in time, overflow parts will be dropped.
+    // This makes less than expected data, especially in system wide recording. So add a periodic
+    // event to flush ETM data by temporarily disabling all perf events.
+    EventFd* last_fd = nullptr;
+    for (size_t i = 0; i < etm_with_etr_fds_.size(); i++) {
+      if (i == last_to_disable_etm_index_) {
+        last_fd = etm_with_etr_fds_[i];
+        continue;
+      }
+      if (!etm_with_etr_fds_[i]->SetEnableEvent(false)) {
+        return false;
+      }
     }
-    if (!etm_event_fds_[i]->SetEnableEvent(false)) {
+    if (!last_fd->SetEnableEvent(false)) {
       return false;
     }
-  }
-  if (!last_fd->SetEnableEvent(false)) {
-    return false;
-  }
-  // When using ETR, ETM data is flushed to the aux buffer of the last cpu disabling ETM events. To
-  // avoid overflowing the aux buffer for one cpu, rotate the last cpu disabling ETM events. Disable
-  // ETM event on each cpu except for the last cpu.
-  last_to_disable_etm_index_ = (last_to_disable_etm_index_ + 1) % etm_event_fds_.size();
+    // When using ETR, ETM data is flushed to the aux buffer of the last cpu disabling ETM events.
+    // To avoid overflowing the aux buffer for one cpu, rotate the last cpu disabling ETM events.
+    // Disable ETM event on each cpu except for the last cpu.
+    last_to_disable_etm_index_ = (last_to_disable_etm_index_ + 1) % etm_with_etr_fds_.size();
 
-  // Enable ETM events to restart ETM tracing.
-  for (auto fd : etm_event_fds_) {
-    if (!fd->SetEnableEvent(true)) {
-      return false;
+    // Enable ETM events to restart ETM tracing.
+    for (auto fd : etm_with_etr_fds_) {
+      if (!fd->SetEnableEvent(true)) {
+        return false;
+      }
     }
   }
   return true;

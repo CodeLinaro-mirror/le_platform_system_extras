@@ -220,7 +220,7 @@ class RecordReadThread {
   // ETM related members
   bool has_etm_events_ = false;
   std::chrono::milliseconds etm_flush_interval_;
-  std::vector<EventFd*> etm_event_fds_;
+  std::vector<EventFd*> etm_with_etr_fds_;
   size_t last_to_disable_etm_index_ = 0;
 
   std::unordered_set<EventFd*> event_fds_disabled_by_kernel_;
