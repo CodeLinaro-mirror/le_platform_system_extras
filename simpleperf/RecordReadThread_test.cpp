@@ -26,6 +26,7 @@
 #include "record_file.h"
 
 using ::testing::_;
+using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::Return;
 using ::testing::Truly;
@@ -147,6 +148,7 @@ struct MockEventFd : public EventFd {
     }
   }
 
+  MOCK_METHOD1(SetEnableEvent, bool(bool));
   MOCK_METHOD2(CreateMappedBuffer, bool(size_t, bool));
   MOCK_METHOD0(DestroyMappedBuffer, void());
   MOCK_METHOD2(StartPolling, bool(IOEventLoop&, const std::function<bool()>&));
@@ -529,6 +531,7 @@ TEST_F(RecordReadThreadTest, read_aux_data) {
   EXPECT_CALL(fd, CreateMappedBuffer(_, _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, CreateAuxBuffer(Eq(AUX_BUFFER_SIZE), _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, StartPolling(_, _)).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(fd, SetEnableEvent(_)).Times(AnyNumber()).WillRepeatedly(Return(true));
   EXPECT_CALL(fd, GetAvailableMmapDataSize(_)).Times(aux_data.size()).WillRepeatedly(Return(0));
   EXPECT_CALL(fd,
               GetAvailableAuxData(Truly(SetBuf1), Truly(SetSize1), Truly(SetBuf2), Truly(SetSize2)))

@@ -785,18 +785,6 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
         return false;
       }
     }
-    // ETM data is dumped to kernel buffer only when there is no thread traced by ETM. It happens
-    // either when all monitored threads are scheduled off cpu, or when all etm perf events are
-    // disabled.
-    // If ETM data isn't dumped to kernel buffer in time, overflow parts will be dropped. This
-    // makes less than expected data, especially in system wide recording. So add a periodic event
-    // to flush etm data by temporarily disable all perf events.
-    auto etm_flush = [this]() {
-      return event_selection_set_.DisableETMEvents() && event_selection_set_.EnableETMEvents();
-    };
-    if (!loop->AddPeriodicEvent(SecondToTimeval(etm_flush_interval_.count() / 1000.0), etm_flush)) {
-      return false;
-    }
 
     if (etm_branch_list_generator_) {
       if (exclude_perf_) {
@@ -829,12 +817,6 @@ bool RecordCommand::DoRecording(Workload* workload) {
     return false;
   }
   time_stat_.stop_recording_time = GetSystemClock();
-  if (event_selection_set_.HasAuxTrace()) {
-    // Disable ETM events to flush the last ETM data.
-    if (!event_selection_set_.DisableETMEvents()) {
-      return false;
-    }
-  }
   if (!event_selection_set_.SyncKernelBuffer()) {
     return false;
   }

@@ -19,6 +19,7 @@
 #include <sys/types.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <memory>
@@ -31,6 +32,8 @@
 
 #include "event_fd.h"
 #include "record.h"
+
+using namespace std::chrono_literals;
 
 namespace simpleperf {
 
@@ -132,7 +135,8 @@ class RecordReadThread {
  public:
   RecordReadThread(size_t record_buffer_size, const perf_event_attr& attr, size_t min_mmap_pages,
                    size_t max_mmap_pages, size_t aux_buffer_size,
-                   bool allow_truncating_samples = true, bool exclude_perf = false);
+                   bool allow_truncating_samples = true, bool exclude_perf = false,
+                   std::chrono::milliseconds etm_flush_interval = 100ms);
   ~RecordReadThread();
   void SetBufferLevels(size_t record_buffer_low_level, size_t record_buffer_critical_level) {
     record_buffer_low_level_ = record_buffer_low_level;
@@ -180,6 +184,7 @@ class RecordReadThread {
   void PushRecordToRecordBuffer(KernelRecordReader* kernel_record_reader);
   void ReadAuxDataFromKernelBuffer(bool* has_data);
   bool SendDataNotificationToMainThread();
+  bool FlushETMData();
 
   RecordBuffer record_buffer_;
   // When free size in record buffer is below low level, we cut stack data of sample records to 1K.
@@ -211,7 +216,12 @@ class RecordReadThread {
   std::unique_ptr<std::thread> read_thread_;
   std::vector<KernelRecordReader> kernel_record_readers_;
   pid_t exclude_pid_ = -1;
+
+  // ETM related members
   bool has_etm_events_ = false;
+  std::chrono::milliseconds etm_flush_interval_;
+  std::vector<EventFd*> etm_event_fds_;
+  size_t last_to_disable_etm_index_ = 0;
 
   std::unordered_set<EventFd*> event_fds_disabled_by_kernel_;
 

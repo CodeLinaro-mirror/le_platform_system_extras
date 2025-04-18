@@ -1013,45 +1013,4 @@ bool EventSelectionSet::EnableETMEvents() {
   return true;
 }
 
-bool EventSelectionSet::DisableETMEvents() {
-  for (auto& group : groups_) {
-    for (auto& sel : group.selections) {
-      if (!sel.event_type_modifier.event_type.IsEtmEvent()) {
-        continue;
-      }
-      // When using ETR, ETM data is flushed to the aux buffer of the last cpu disabling ETM events.
-      // To avoid overflowing the aux buffer for one cpu, rotate the last cpu disabling ETM events.
-      if (etm_event_cpus_.empty()) {
-        for (const auto& fd : sel.event_fds) {
-          etm_event_cpus_.insert(fd->Cpu());
-        }
-        if (etm_event_cpus_.empty()) {
-          continue;
-        }
-        etm_event_cpus_it_ = etm_event_cpus_.begin();
-      }
-      int last_disabled_cpu = *etm_event_cpus_it_;
-      if (++etm_event_cpus_it_ == etm_event_cpus_.end()) {
-        etm_event_cpus_it_ = etm_event_cpus_.begin();
-      }
-
-      for (auto& fd : sel.event_fds) {
-        if (fd->Cpu() != last_disabled_cpu) {
-          if (!fd->SetEnableEvent(false)) {
-            return false;
-          }
-        }
-      }
-      for (auto& fd : sel.event_fds) {
-        if (fd->Cpu() == last_disabled_cpu) {
-          if (!fd->SetEnableEvent(false)) {
-            return false;
-          }
-        }
-      }
-    }
-  }
-  return true;
-}
-
 }  // namespace simpleperf
