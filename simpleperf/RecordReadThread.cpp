@@ -222,6 +222,25 @@ bool KernelRecordReader::MoveToNextRecord(const RecordParser& parser) {
   return true;
 }
 
+timeval ETMDataRateLimiter::GetNextReadInterval(uint64_t data_size, uint64_t timestamp) {
+  // desired_time_elapsed_ns: The target elapsed time (in nanoseconds) to receive data_size bytes,
+  // based on max_size_per_second_.
+  uint64_t desired_time_elapsed_ns = (data_size * 1000000000) / max_size_per_second_;
+
+  // actual_time_elapsed_ns: The actual time elapsed (in nanoseconds) since the start timestamp.
+  uint64_t actual_time_elapsed_ns = timestamp - start_timestamp_;
+
+  uint64_t read_interval_ns = min_read_interval_ns_;
+  if (actual_time_elapsed_ns < desired_time_elapsed_ns) {
+    read_interval_ns = std::max(read_interval_ns, desired_time_elapsed_ns - actual_time_elapsed_ns);
+  }
+
+  timeval tv;
+  tv.tv_sec = read_interval_ns / 1000000000;
+  tv.tv_usec = read_interval_ns % 1000000000 / 1000;
+  return tv;
+}
+
 RecordReadThread::RecordReadThread(size_t record_buffer_size, const perf_event_attr& attr,
                                    size_t min_mmap_pages, size_t max_mmap_pages,
                                    size_t aux_buffer_size, bool allow_truncating_samples,
@@ -232,7 +251,9 @@ RecordReadThread::RecordReadThread(size_t record_buffer_size, const perf_event_a
       min_mmap_pages_(min_mmap_pages),
       max_mmap_pages_(max_mmap_pages),
       aux_buffer_size_(aux_buffer_size),
-      etm_flush_interval_(etm_flush_interval) {
+      // max_size_per_second is based on the ETM data generation rate from ETR-based ETM events.
+      etm_data_rate_limiter_(aux_buffer_size * 1000 / etm_flush_interval.count(),
+                             etm_flush_interval, GetSystemClock()) {
   if (attr.sample_type & PERF_SAMPLE_STACK_USER) {
     stack_size_in_sample_record_ = attr.sample_stack_user;
   }
@@ -445,8 +466,8 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
   }
   if (has_etm_events_) {
     // To prevent ETM data flooding from TRBE, read ETM data periodically instead of polling.
-    if (!loop.AddPeriodicEvent(SecondToTimeval(etm_flush_interval_.count() / 1000.0),
-                               [this]() { return ReadETMData(); })) {
+    if (!loop.AddOneTimeEvent(etm_data_rate_limiter_.GetNextReadInterval(0, GetSystemClock()),
+                              [&]() { return PeriodicallyReadETMData(loop); })) {
       return false;
     }
   } else {
@@ -701,6 +722,16 @@ bool RecordReadThread::SendDataNotificationToMainThread() {
     }
   }
   return true;
+}
+
+bool RecordReadThread::PeriodicallyReadETMData(IOEventLoop& loop) {
+  if (!ReadETMData()) {
+    return false;
+  }
+  timeval read_interval =
+      etm_data_rate_limiter_.GetNextReadInterval(stat_.aux_data_size, GetSystemClock());
+  return loop.AddOneTimeEvent(read_interval, [&]() { return PeriodicallyReadETMData(loop); }) !=
+         nullptr;
 }
 
 bool RecordReadThread::ReadETMData() {

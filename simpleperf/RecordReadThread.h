@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <sys/time.h>
 #include <sys/types.h>
 
 #include <atomic>
@@ -129,6 +130,29 @@ class KernelRecordReader {
   uint64_t record_time_ = 0;
 };
 
+// ETR-based ETM events aggregate data from all CPUs into a single buffer, while TRBE-based ETM
+// events send data to per-CPU buffers. So they have significant differences in data generate rates.
+// To provide a consistent user experience (not flooding data when switching from ETR to TRBE), we
+// use ETMDataRateLimiter to dynamically adjust ETM data read interval.
+class ETMDataRateLimiter {
+ public:
+  ETMDataRateLimiter(uint64_t max_size_per_second, std::chrono::milliseconds min_read_interval,
+                     uint64_t start_timestamp)
+      : max_size_per_second_(max_size_per_second),
+        min_read_interval_ns_(min_read_interval.count() * 1000000),
+        start_timestamp_(start_timestamp) {}
+
+  // data_size: the total size of ETM data read so far
+  // timestamp: current monotonic timestamp (in nonoseconds)
+  // Return a time interval to sleep before reading new ETM data.
+  timeval GetNextReadInterval(uint64_t data_size, uint64_t timestamp);
+
+ private:
+  uint64_t max_size_per_second_;
+  uint64_t min_read_interval_ns_;
+  uint64_t start_timestamp_;
+};
+
 // To reduce sample lost rate when recording dwarf based call graph, RecordReadThread uses a
 // separate high priority (nice -20) thread to read records from kernel buffers to a RecordBuffer.
 class RecordReadThread {
@@ -184,6 +208,7 @@ class RecordReadThread {
   void PushRecordToRecordBuffer(KernelRecordReader* kernel_record_reader);
   void ReadAuxDataFromKernelBuffer(bool* has_data);
   bool SendDataNotificationToMainThread();
+  bool PeriodicallyReadETMData(IOEventLoop& loop);
   bool ReadETMData();
 
   RecordBuffer record_buffer_;
@@ -219,7 +244,7 @@ class RecordReadThread {
 
   // ETM related members
   bool has_etm_events_ = false;
-  std::chrono::milliseconds etm_flush_interval_;
+  ETMDataRateLimiter etm_data_rate_limiter_;
   std::vector<EventFd*> etm_with_etr_fds_;
   size_t last_to_disable_etm_index_ = 0;
 

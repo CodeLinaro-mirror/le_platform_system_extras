@@ -24,7 +24,9 @@
 #include "record.h"
 #include "record_equal_test.h"
 #include "record_file.h"
+#include "utils.h"
 
+using namespace std::chrono_literals;
 using ::testing::_;
 using ::testing::AnyNumber;
 using ::testing::Eq;
@@ -234,6 +236,38 @@ TEST(KernelRecordReader, smoke) {
     ASSERT_EQ(0, memcmp(&data[0], records[i]->Binary(), records[i]->size()));
   }
   ASSERT_FALSE(reader.MoveToNextRecord(parser));
+}
+
+bool operator==(const timeval& a, const timeval& b) {
+  return a.tv_sec == b.tv_sec && a.tv_usec == b.tv_usec;
+}
+
+// @CddTest = 6.1/C-0-2
+TEST(ETMDataRateLimiter, smoke) {
+  constexpr uint64_t MB = 1000 * 1000;
+  const uint64_t start_timestamp = GetSystemClock();
+
+  auto get_timestamp = [&](double seconds) {
+    return start_timestamp + static_cast<uint64_t>(seconds * 1000000000);
+  };
+
+  ETMDataRateLimiter limiter(40 * MB, 100ms, start_timestamp);
+  // Test receiving more than limit.
+  // First sleep is 0.1s (minimum interval).
+  ASSERT_EQ(limiter.GetNextReadInterval(0, get_timestamp(0)), SecondToTimeval(0.1));
+  // We received 20 MB in 0.1s, while it should take 0.5s. So sleep 0.4s.
+  ASSERT_EQ(limiter.GetNextReadInterval(20 * MB, get_timestamp(0.1)), SecondToTimeval(0.4));
+  // We received 30 MB in 0.5s, while it should take 0.75s. So sleep 0.25s.
+  ASSERT_EQ(limiter.GetNextReadInterval(30 * MB, get_timestamp(0.5)), SecondToTimeval(0.25));
+  // We received 40 MB in 0.75s, while it should take 1s. So sleep 0.25s.
+  ASSERT_EQ(limiter.GetNextReadInterval(40 * MB, get_timestamp(0.75)), SecondToTimeval(0.25));
+  // We received 50 MB in 1s, while it should take 1.25s. So sleep 0.25s.
+  ASSERT_EQ(limiter.GetNextReadInterval(50 * MB, get_timestamp(1)), SecondToTimeval(0.25));
+  // Test receiving less than limit.
+  // We received 50 MB in 1.25s, while it should take 1.25s. So sleep 0.1s (minimum interval).
+  ASSERT_EQ(limiter.GetNextReadInterval(50 * MB, get_timestamp(1.25)), SecondToTimeval(0.1));
+  // We received 50 MB in 1.35s, while it should take 1.25s. So sleep 0.1s (minimum interval).
+  ASSERT_EQ(limiter.GetNextReadInterval(50 * MB, get_timestamp(1.35)), SecondToTimeval(0.1));
 }
 
 // @CddTest = 6.1/C-0-2
