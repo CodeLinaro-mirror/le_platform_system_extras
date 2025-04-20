@@ -1107,6 +1107,9 @@ TEST(record_cmd, cs_etm_event) {
   ASSERT_TRUE(has_auxtrace);
   ASSERT_TRUE(has_aux);
   ASSERT_TRUE(!reader->ReadBuildIdFeature().empty());
+
+  // We can explicitly use ETR. Because ETR is ready after CheckEtmSupport().
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm/@tmc_etr0/"}, tmpfile.path));
 }
 
 // @CddTest = 6.1/C-0-2

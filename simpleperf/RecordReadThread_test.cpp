@@ -138,8 +138,8 @@ TEST(RecordParser, GetStackSizePos_with_PerfSampleReadType) {
 
 struct MockEventFd : public EventFd {
   MockEventFd(const perf_event_attr& attr, int cpu, char* buffer, size_t buffer_size,
-              bool mock_aux_buffer)
-      : EventFd(attr, -1, "", 0, cpu) {
+              bool mock_aux_buffer, const std::string& event_name = "")
+      : EventFd(attr, -1, event_name, 0, cpu) {
     mmap_data_buffer_ = buffer;
     mmap_data_buffer_size_ = buffer_size;
     if (mock_aux_buffer) {
@@ -525,7 +525,7 @@ TEST_F(RecordReadThreadTest, read_aux_data) {
   const size_t AUX_BUFFER_SIZE = 4096;
 
   perf_event_attr attr = CreateDefaultPerfEventAttr(*type);
-  MockEventFd fd(attr, 0, nullptr, 1, true);
+  MockEventFd fd(attr, 0, nullptr, 1, true, "cs-etm");
   EXPECT_CALL(fd, CreateMappedBuffer(_, _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, CreateAuxBuffer(Eq(AUX_BUFFER_SIZE), _)).Times(1).WillOnce(Return(true));
   EXPECT_CALL(fd, StartPolling(_, _)).Times(1).WillOnce(Return(true));

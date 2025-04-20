@@ -140,7 +140,7 @@ class PerfDataReader {
       return "unknown";
     }
     const perf_event_attr& attr = attrs[0].attr;
-    if (IsEtmEventType(attr.type)) {
+    if (IsEtmEventName(GetEventNameByAttr(attr))) {
       return "etm";
     }
     if (attr.sample_type & PERF_SAMPLE_BRANCH_STACK) {

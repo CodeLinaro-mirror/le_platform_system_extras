@@ -49,6 +49,7 @@ class EventFd {
 
   // Give information about this perf_event_file, like (event_name, tid, cpu).
   std::string Name() const;
+  const std::string EventName() const { return event_name_; }
 
   uint64_t Id() const;
 

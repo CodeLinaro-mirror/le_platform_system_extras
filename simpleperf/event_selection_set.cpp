@@ -227,13 +227,14 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
   selection->event_attr.exclude_host = event_type->exclude_host;
   selection->event_attr.exclude_guest = event_type->exclude_guest;
   selection->event_attr.precise_ip = event_type->precise_ip;
-  if (IsEtmEventType(event_type->event_type.type)) {
+  if (event_type->event_type.IsEtmEvent()) {
     auto& etm_recorder = ETMRecorder::GetInstance();
-    if (auto result = etm_recorder.CheckEtmSupport(); !result.ok()) {
+    bool need_etr = event_type->event_type.name.find("@tmc_etr0") != std::string::npos;
+    if (auto result = etm_recorder.CheckEtmSupport(need_etr); !result.ok()) {
       LOG(ERROR) << result.error();
       return false;
     }
-    ETMRecorder::GetInstance().SetEtmPerfEventAttr(&selection->event_attr);
+    ETMRecorder::GetInstance().SetEtmPerfEventAttr(event_type->event_type, selection->event_attr);
     // The kernel (rb_allocate_aux) allocates high order of pages based on aux_watermark.
     // To avoid that, use aux_watermark <= 1 page size.
     selection->event_attr.aux_watermark = 4096;
@@ -243,7 +244,7 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
     if (event_type->event_type.type == PERF_TYPE_TRACEPOINT) {
       selection->event_attr.freq = 0;
       selection->event_attr.sample_period = DEFAULT_SAMPLE_PERIOD_FOR_TRACEPOINT_EVENT;
-    } else if (IsEtmEventType(event_type->event_type.type)) {
+    } else if (event_type->event_type.IsEtmEvent()) {
       // ETM recording has no sample frequency to adjust. Using sample frequency only wastes time
       // enabling/disabling etm devices. So don't adjust frequency by default.
       selection->event_attr.freq = 0;
@@ -322,7 +323,7 @@ bool EventSelectionSet::AddEventGroup(const std::vector<std::string>& event_name
     if (!BuildAndCheckEventSelection(event_name, first_event, &selection, check)) {
       return false;
     }
-    if (IsEtmEventType(selection.event_attr.type)) {
+    if (selection.event_type_modifier.event_type.IsEtmEvent()) {
       has_aux_trace_ = true;
     }
     if (first_in_group) {
@@ -827,7 +828,7 @@ bool EventSelectionSet::ApplyAddrFilters() {
 
   for (auto& group : groups_) {
     for (auto& selection : group.selections) {
-      if (IsEtmEventType(selection.event_type_modifier.event_type.type)) {
+      if (selection.event_type_modifier.event_type.IsEtmEvent()) {
         for (auto& event_fd : selection.event_fds) {
           if (!event_fd->SetFilter(filter_str)) {
             return false;
