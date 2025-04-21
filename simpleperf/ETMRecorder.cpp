@@ -101,20 +101,25 @@ int ETMRecorder::GetEtmEventType() {
   return event_type_;
 }
 
-std::unique_ptr<EventType> ETMRecorder::BuildEventType() {
+void ETMRecorder::BuildEventTypes(std::set<EventType>& event_types) {
   int etm_event_type = GetEtmEventType();
   if (etm_event_type == -1) {
-    return nullptr;
+    return;
   }
-  return std::make_unique<EventType>("cs-etm", etm_event_type, 0,
-                                     "CoreSight ETM instruction tracing", "arm");
+  if (CheckSinkSupport()) {
+    event_types.emplace("cs-etm", etm_event_type, 0, "Coresight ETM instruction tracing", "arm");
+    if (has_etr_sink) {
+      event_types.emplace("cs-etm/@tmc_etr0/", etm_event_type, 0,
+                          "Coresight ETM instruction tracing (via ETR)", "arm");
+    }
+  }
 }
 
 bool ETMRecorder::IsETMDriverAvailable() {
   return IsDir(ETM_DIR);
 }
 
-expected<bool, std::string> ETMRecorder::CheckEtmSupport() {
+expected<bool, std::string> ETMRecorder::CheckEtmSupport(bool need_etr) {
   if (GetEtmEventType() == -1) {
     return unexpected("etm event type isn't supported on device");
   }
@@ -132,7 +137,8 @@ expected<bool, std::string> ETMRecorder::CheckEtmSupport() {
       return unexpected("etm device isn't enabled by the bootloader");
     }
   }
-  if (!FindSinkConfig()) {
+  bool has_sink = CheckSinkSupport();
+  if (need_etr && !has_etr_sink) {
     // Trigger a manual probe of etr. Then wait and recheck.
     std::string prop_name = "profcollectd.etr.probe";
     bool res = android::base::SetProperty(prop_name, "1");
@@ -140,9 +146,13 @@ expected<bool, std::string> ETMRecorder::CheckEtmSupport() {
       LOG(ERROR) << "fails to setprop" << prop_name;
     }
     usleep(200000);  // Wait for 200ms.
-    if (!FindSinkConfig()) {
+    has_sink = CheckSinkSupport();
+    if (!has_etr_sink) {
       return unexpected("can't find etr device, which moves etm data to memory");
     }
+  }
+  if (!has_sink) {
+    return unexpected("can't find etr/trbe device, which moves etm data to memory");
   }
   etm_supported_ = true;
   return true;
@@ -180,34 +190,40 @@ bool ETMRecorder::ReadEtmInfo() {
   return (etm_info_.size() == online_cpus.size());
 }
 
-bool ETMRecorder::FindSinkConfig() {
-  bool has_etr = false;
-  bool has_trbe = false;
+bool ETMRecorder::CheckSinkSupport() {
+  has_etr_sink = false;
+  has_trbe_sink = false;
+  etr_sink_config_ = 0;
+  trbe_supported_cpus_.clear();
+
   for (const auto& name : GetEntriesInDir(ETM_DIR + "sinks")) {
-    if (!has_etr && name.find("etr") != -1) {
-      if (ReadValueInEtmDir("sinks/" + name, &sink_config_)) {
-        has_etr = true;
+    if (name.find("etr") != -1) {
+      if (ReadValueInEtmDir("sinks/" + name, &etr_sink_config_)) {
+        has_etr_sink = true;
+      }
+    } else if (name.find("trbe") != -1) {
+      int cpu;
+      if (android::base::ParseInt(&name[4], &cpu)) {
+        trbe_supported_cpus_.push_back(cpu);
+        has_trbe_sink = true;
       }
     }
-    if (name.find("trbe") != -1) {
-      has_trbe = true;
-      break;
-    }
   }
-  if (has_trbe) {
-    // When TRBE is present, let the driver choose the most suitable
-    // configuration.
-    sink_config_ = 0;
-  }
-  return has_trbe || has_etr;
+  return has_trbe_sink || has_etr_sink;
 }
 
-void ETMRecorder::SetEtmPerfEventAttr(perf_event_attr* attr) {
+void ETMRecorder::SetEtmPerfEventAttr(const EventType& event_type, perf_event_attr& attr) {
   CHECK(etm_supported_);
   BuildEtmConfig();
-  attr->config = etm_event_config_;
-  attr->config2 = sink_config_;
-  attr->config3 = cc_threshold_config_;
+  attr.config = etm_event_config_;
+  if (has_trbe_sink && event_type.name.find("@tmc_etr0") == std::string::npos) {
+    // When TRBE is present and user doesn't explicitly choose ETR, let the driver choose the most
+    // suitable configuration.
+    attr.config2 = 0;
+  } else {
+    attr.config2 = etr_sink_config_;
+  }
+  attr.config3 = cc_threshold_config_;
 }
 
 void ETMRecorder::BuildEtmConfig() {

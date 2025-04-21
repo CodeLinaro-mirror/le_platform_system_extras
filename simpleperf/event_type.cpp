@@ -300,20 +300,10 @@ class ETMTypeFinder : public EventTypeFinder {
  public:
   ETMTypeFinder() : EventTypeFinder(EventFinderType::ETM) {}
 
-  const EventType* FindType(const std::string& name) override {
-    if (name != kETMEventName) {
-      return nullptr;
-    }
-    return EventTypeFinder::FindType(name);
-  }
-
  protected:
   void LoadTypes() override {
 #if defined(__linux__)
-    std::unique_ptr<EventType> etm_type = ETMRecorder::GetInstance().BuildEventType();
-    if (etm_type) {
-      types_.emplace(std::move(*etm_type));
-    }
+    ETMRecorder::GetInstance().BuildEventTypes(types_);
 #endif
   }
 };
@@ -592,11 +582,6 @@ std::unique_ptr<EventTypeAndModifier> ParseEventType(const std::string& event_ty
   }
   event_type_modifier->modifier = modifier;
   return event_type_modifier;
-}
-
-bool IsEtmEventType(uint32_t type) {
-  const EventType* event_type = EventTypeManager::Instance().FindType(kETMEventName);
-  return (event_type != nullptr) && (event_type->type == type);
 }
 
 }  // namespace simpleperf
