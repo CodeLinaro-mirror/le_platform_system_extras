@@ -370,3 +370,31 @@ TEST(cmd_inject, exclude_process_name_option) {
   ASSERT_EQ(stat(tmpfile.path, &st), -1);
   ASSERT_EQ(errno, ENOENT);
 }
+
+// @CddTest = 6.1/C-0-2
+TEST(cmd_inject, check_missing_aux_data) {
+  // Inject a malformed perf.data where an aux record's offset was changed to
+  // point outside the file. It should report warnings and generate an empty file.
+  android::base::ScopedLogSeverity severity(android::base::INFO);
+  CapturedStderr capture;
+  TemporaryFile tmpfile;
+  close(tmpfile.release());
+  ASSERT_TRUE(RunInjectCmd({"-i", GetTestData("etm/perf_etm_wrong_aux.data"), "-o", tmpfile.path}));
+  capture.Stop();
+  const std::string INFO_MSG = "aux data is missing";
+  ASSERT_NE(capture.str().find(INFO_MSG), std::string::npos);
+  std::string data;
+  ASSERT_TRUE(android::base::ReadFileToString(tmpfile.path, &data));
+  ASSERT_TRUE(data.empty());
+
+  // Inject a compressed perf.data which has no missing aux data. It should report no warnings
+  // and generate a non empty file.
+  capture.Reset();
+  capture.Start();
+  ASSERT_TRUE(
+      RunInjectCmd({"-i", GetTestData("etm/perf_etm_compressed.data"), "-o", tmpfile.path}));
+  capture.Stop();
+  ASSERT_EQ(capture.str().find(INFO_MSG), std::string::npos);
+  ASSERT_TRUE(android::base::ReadFileToString(tmpfile.path, &data));
+  ASSERT_FALSE(data.empty());
+}
