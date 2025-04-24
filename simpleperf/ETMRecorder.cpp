@@ -320,4 +320,12 @@ void ETMRecorder::SetCycleThreshold(size_t threshold) {
   cycle_threshold_ = threshold;
 }
 
+bool ETMRecorder::IsUsingTRBE(const perf_event_attr& attr, int cpu) const {
+  if (attr.config2 != 0) {
+    return false;
+  }
+  return std::find(trbe_supported_cpus_.begin(), trbe_supported_cpus_.end(), cpu) !=
+         trbe_supported_cpus_.end();
+}
+
 }  // namespace simpleperf
