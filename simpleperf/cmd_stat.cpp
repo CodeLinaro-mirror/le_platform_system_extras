@@ -1050,6 +1050,46 @@ void StatCommand::AdjustToIntervalOnlyValues(std::vector<CountersInfo>& counters
   }
 }
 
+// Normalize a single entry intended for use in a CSV file.
+//
+// If the given string contains a comma, the entire entry needs to be quoted. If
+// the string contains a double quote character, it should also be quoted and
+// the double quotes escaped by doubling them.
+//
+// See https://en.wikipedia.org/wiki/Comma-separated_values for more details.
+std::string NormalizeCsvEntry(std::string_view entry) {
+  bool needs_quotes = false;
+  int num_quotes = 0;
+  for (char ch : entry) {
+    switch (ch) {
+      case '"':
+        ++num_quotes;
+        needs_quotes = true;
+        break;
+      case ',':
+        needs_quotes = true;
+        break;
+      default:
+        break;
+    }
+  }
+  if (!needs_quotes) {
+    return std::string(entry);
+  }
+  std::string normalized_entry;
+  normalized_entry.reserve(entry.size() + num_quotes + 2);
+  normalized_entry += '"';
+  for (char ch : entry) {
+    if (ch == '"') {
+      normalized_entry += "\"\"";
+    } else {
+      normalized_entry += ch;
+    }
+  }
+  normalized_entry += '"';
+  return normalized_entry;
+}
+
 bool StatCommand::ShowCounters(const std::vector<CountersInfo>& counters, double duration_in_sec,
                                FILE* fp) {
   if (csv_) {
@@ -1065,8 +1105,8 @@ bool StatCommand::ShowCounters(const std::vector<CountersInfo>& counters, double
           fprintf(fp,
                   "%s,tid,%d,cpu,%d,count,%" PRIu64 ",time_enabled,%" PRIu64
                   ",time running,%" PRIu64 ",id,%" PRIu64 ",\n",
-                  counters_info.event_name.c_str(), counter_info.tid, counter_info.cpu,
-                  counter_info.counter.value, counter_info.counter.time_enabled,
+                  NormalizeCsvEntry(counters_info.event_name).c_str(), counter_info.tid,
+                  counter_info.cpu, counter_info.counter.value, counter_info.counter.time_enabled,
                   counter_info.counter.time_running, counter_info.counter.id);
         } else {
           fprintf(fp,
