@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "ETMRecorder.h"
 #include "environment.h"
 #include "event_type.h"
 #include "record.h"
@@ -221,16 +222,38 @@ bool KernelRecordReader::MoveToNextRecord(const RecordParser& parser) {
   return true;
 }
 
+timeval ETMDataRateLimiter::GetNextReadInterval(uint64_t data_size, uint64_t timestamp) {
+  // desired_time_elapsed_ns: The target elapsed time (in nanoseconds) to receive data_size bytes,
+  // based on max_size_per_second_.
+  uint64_t desired_time_elapsed_ns = (data_size * 1000000000) / max_size_per_second_;
+
+  // actual_time_elapsed_ns: The actual time elapsed (in nanoseconds) since the start timestamp.
+  uint64_t actual_time_elapsed_ns = timestamp - start_timestamp_;
+
+  uint64_t read_interval_ns = min_read_interval_ns_;
+  if (actual_time_elapsed_ns < desired_time_elapsed_ns) {
+    read_interval_ns = std::max(read_interval_ns, desired_time_elapsed_ns - actual_time_elapsed_ns);
+  }
+
+  timeval tv;
+  tv.tv_sec = read_interval_ns / 1000000000;
+  tv.tv_usec = read_interval_ns % 1000000000 / 1000;
+  return tv;
+}
+
 RecordReadThread::RecordReadThread(size_t record_buffer_size, const perf_event_attr& attr,
                                    size_t min_mmap_pages, size_t max_mmap_pages,
                                    size_t aux_buffer_size, bool allow_truncating_samples,
-                                   bool exclude_perf)
+                                   bool exclude_perf, std::chrono::milliseconds etm_flush_interval)
     : record_buffer_(record_buffer_size),
       record_parser_(attr),
       attr_(attr),
       min_mmap_pages_(min_mmap_pages),
       max_mmap_pages_(max_mmap_pages),
-      aux_buffer_size_(aux_buffer_size) {
+      aux_buffer_size_(aux_buffer_size),
+      // max_size_per_second is based on the ETM data generation rate from ETR-based ETM events.
+      etm_data_rate_limiter_(aux_buffer_size * 1000 / etm_flush_interval.count(),
+                             etm_flush_interval, GetSystemClock()) {
   if (attr.sample_type & PERF_SAMPLE_STACK_USER) {
     stack_size_in_sample_record_ = attr.sample_stack_user;
   }
@@ -372,7 +395,11 @@ bool RecordReadThread::HandleCmd(IOEventLoop& loop) {
       result = HandleRemoveEventFds(*static_cast<std::vector<EventFd*>*>(cmd_arg_));
       break;
     case CMD_SYNC_KERNEL_BUFFER:
-      result = ReadRecordsFromKernelBuffer();
+      if (has_etm_events_) {
+        result = ReadETMData();
+      } else {
+        result = ReadRecordsFromKernelBuffer();
+      }
       break;
     case CMD_STOP_THREAD:
       result = loop.ExitLoop();
@@ -409,6 +436,9 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
             break;
           }
           has_etm_events_ = true;
+          if (!ETMRecorder::GetInstance().IsUsingTRBE(fd->attr(), fd->Cpu())) {
+            etm_with_etr_fds_.push_back(fd);
+          }
         }
         cpu_map[fd->Cpu()] = fd;
       } else {
@@ -432,10 +462,21 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
     return false;
   }
   for (auto& pair : cpu_map) {
-    if (!pair.second->StartPolling(loop, [this]() { return ReadRecordsFromKernelBuffer(); })) {
+    kernel_record_readers_.emplace_back(pair.second);
+  }
+  if (has_etm_events_) {
+    // To prevent ETM data flooding from TRBE, read ETM data periodically instead of polling.
+    if (!loop.AddOneTimeEvent(etm_data_rate_limiter_.GetNextReadInterval(0, GetSystemClock()),
+                              [&]() { return PeriodicallyReadETMData(loop); })) {
       return false;
     }
-    kernel_record_readers_.emplace_back(pair.second);
+  } else {
+    for (auto& reader : kernel_record_readers_) {
+      if (!reader.GetEventFd()->StartPolling(loop,
+                                             [this]() { return ReadRecordsFromKernelBuffer(); })) {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -483,8 +524,8 @@ bool RecordReadThread::ReadRecordsFromKernelBuffer() {
       } else {
         // Use a binary heap to merge records from different buffers. As records from the same
         // buffer are already ordered by time, we only need to merge the first record from all
-        // buffers. And each time a record is popped from the heap, we put the next record from its
-        // buffer into the heap.
+        // buffers. And each time a record is popped from the heap, we put the next record from
+        // its buffer into the heap.
         for (auto& reader : readers) {
           reader->MoveToNextRecord(record_parser_);
         }
@@ -516,7 +557,8 @@ bool RecordReadThread::ReadRecordsFromKernelBuffer() {
       return false;
     }
     // If there are no commands, we can loop until there is no more data from the kernel.
-  } while (GetCmd() == NO_CMD);
+    // To prevent ETM data flooding from TRBE, avoid reading ETM data in a loop.
+  } while (GetCmd() == NO_CMD && !has_etm_events_);
   return true;
 }
 
@@ -680,6 +722,52 @@ bool RecordReadThread::SendDataNotificationToMainThread() {
     }
   }
   return true;
+}
+
+bool RecordReadThread::PeriodicallyReadETMData(IOEventLoop& loop) {
+  if (!ReadETMData()) {
+    return false;
+  }
+  timeval read_interval =
+      etm_data_rate_limiter_.GetNextReadInterval(stat_.aux_data_size, GetSystemClock());
+  return loop.AddOneTimeEvent(read_interval, [&]() { return PeriodicallyReadETMData(loop); }) !=
+         nullptr;
+}
+
+bool RecordReadThread::ReadETMData() {
+  if (!etm_with_etr_fds_.empty()) {
+    // For ETM events using ETR as the sink:
+    // ETM data is dumped to kernel buffer only when there is no thread traced by ETM. It happens
+    // either when all monitored threads are scheduled off cpu, or when all ETM perf events are
+    // disabled. If ETM data isn't dumped to kernel buffer in time, overflow parts will be
+    // dropped. This makes less than expected data, especially in system wide recording. So flush
+    // ETM data by temporarily disabling all perf events.
+    EventFd* last_fd = nullptr;
+    for (size_t i = 0; i < etm_with_etr_fds_.size(); i++) {
+      if (i == last_to_disable_etm_index_) {
+        last_fd = etm_with_etr_fds_[i];
+        continue;
+      }
+      if (!etm_with_etr_fds_[i]->SetEnableEvent(false)) {
+        return false;
+      }
+    }
+    if (!last_fd->SetEnableEvent(false)) {
+      return false;
+    }
+    // When using ETR, ETM data is flushed to the aux buffer of the last cpu disabling ETM events.
+    // To avoid overflowing the aux buffer for one cpu, rotate the last cpu disabling ETM events.
+    // Disable ETM event on each cpu except for the last cpu.
+    last_to_disable_etm_index_ = (last_to_disable_etm_index_ + 1) % etm_with_etr_fds_.size();
+
+    // Enable ETM events to restart ETM tracing.
+    for (auto fd : etm_with_etr_fds_) {
+      if (!fd->SetEnableEvent(true)) {
+        return false;
+      }
+    }
+  }
+  return ReadRecordsFromKernelBuffer();
 }
 
 }  // namespace simpleperf
