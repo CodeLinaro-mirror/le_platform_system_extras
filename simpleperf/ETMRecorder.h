@@ -68,6 +68,7 @@ class ETMRecorder {
   void SetRecordTimestamp(bool record);
   void SetRecordCycles(bool record);
   void SetCycleThreshold(size_t threshold);
+  bool IsUsingTRBE(const perf_event_attr& attr, int cpu) const;
 
  private:
   bool ReadEtmInfo();

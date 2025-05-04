@@ -497,6 +497,7 @@ cc_library_shared {
     name: "libsimpleperf_report",
     defaults: [
         "simpleperf_static_libs",
+        "libdexfile_static_transitive_defaults",
     ],
     dist: {
         targets: ["simpleperf"],
@@ -726,6 +727,7 @@ cc_fuzz {
     name: "libsimpleperf_report_fuzzer",
     defaults: [
         "simpleperf_static_libs",
+        "libdexfile_static_transitive_defaults",
     ],
     fuzzing_frameworks: {
         afl: false,
@@ -754,6 +756,7 @@ cc_fuzz {
     name: "simpleperf_writer_fuzzer",
     defaults: [
         "simpleperf_static_libs",
+        "libdexfile_static_transitive_defaults",
     ],
     fuzzing_frameworks: {
         afl: false,
