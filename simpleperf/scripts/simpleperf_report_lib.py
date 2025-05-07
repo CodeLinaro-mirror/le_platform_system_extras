@@ -113,18 +113,25 @@ class TracingFieldFormatStruct(ct.Structure):
         """
         if self.is_dynamic:
             offset, max_len = struct.unpack('<HH', data[self.offset:self.offset + 4])
-            length = 0
-            while length < max_len and bytes_to_str(data[offset + length]) != '\x00':
-                length += 1
-            return bytes_to_str(data[offset: offset + length])
+            try:
+                length = 0
+                while length < max_len and bytes_to_str(data[offset + length]) != '\x00':
+                    length += 1
+                return bytes_to_str(data[offset: offset + length])
+            except UnicodeDecodeError:
+                return data[offset: offset + max_len]
 
         if self.elem_count > 1 and self.elem_size == 1:
             # Probably the field is a string.
             # Don't use self.is_signed, which has different values on x86 and arm.
-            length = 0
-            while length < self.elem_count and bytes_to_str(data[self.offset + length]) != '\x00':
-                length += 1
-            return bytes_to_str(data[self.offset: self.offset + length])
+            try:
+                length = 0
+                while length < self.elem_count and bytes_to_str(
+                        data[self.offset + length]) != '\x00':
+                    length += 1
+                return bytes_to_str(data[self.offset: self.offset + length])
+            except UnicodeDecodeError:
+                pass
         unpack_key = self._unpack_key_dict.get(self.elem_size)
         if unpack_key:
             if not self.is_signed:
@@ -240,6 +247,7 @@ class EventCounterStructure(ct.Structure):
     def name(self) -> str:
         return _char_pt_to_str(self._name)
 
+
 class EventCountersViewStructure(ct.Structure):
     """ An array of event counter.
         nr: number of event counters in the array.
@@ -247,7 +255,6 @@ class EventCountersViewStructure(ct.Structure):
     """
     _fields_ = [('nr', ct.c_size_t),
                 ('event_counter', ct.POINTER(EventCounterStructure))]
-
 
 
 class FeatureSectionStructure(ct.Structure):
