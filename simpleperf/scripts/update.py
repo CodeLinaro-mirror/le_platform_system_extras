@@ -35,35 +35,35 @@ class InstallEntry(object):
 
 INSTALL_LIST = [
     # simpleperf on device.
-    InstallEntry('MODULES-IN-system-extras-simpleperf',
+    InstallEntry('simpleperf_linux_arm64-trunk_staging',
                  'simpleperf/android/arm64/simpleperf_ndk',
                  'android/arm64/simpleperf'),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_arm',
+    InstallEntry('simpleperf_linux_arm64-trunk_staging',
                  'simpleperf/android/arm/simpleperf_ndk32',
                  'android/arm/simpleperf'),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_x86',
+    InstallEntry('simpleperf_linux_x86_64-trunk_staging',
                  'simpleperf/android/x86_64/simpleperf_ndk',
                  'android/x86_64/simpleperf'),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_x86',
+    InstallEntry('simpleperf_linux_x86_64-trunk_staging',
                  'simpleperf/android/x86/simpleperf_ndk32',
                  'android/x86/simpleperf'),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_riscv64',
+    InstallEntry('simpleperf_linux_riscv64-trunk_staging',
                  'simpleperf_ndk',
                  'android/riscv64/simpleperf'),
 
     # simpleperf on host.
-    InstallEntry('MODULES-IN-system-extras-simpleperf',
+    InstallEntry('simpleperf_linux_arm64-trunk_staging',
                  'simpleperf/linux/x86_64/simpleperf',
                  'linux/x86_64/simpleperf', True),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_mac',
+    InstallEntry('simpleperf_mac-trunk_staging',
                  'simpleperf/darwin/x86_64/simpleperf',
                  'darwin/x86_64/simpleperf'),
 
     # libsimpleperf_report.so on host
-    InstallEntry('MODULES-IN-system-extras-simpleperf',
+    InstallEntry('simpleperf_linux_arm64-trunk_staging',
                  'simpleperf/linux/x86_64/libsimpleperf_report.so',
                  'linux/x86_64/libsimpleperf_report.so', True),
-    InstallEntry('MODULES-IN-system-extras-simpleperf_mac',
+    InstallEntry('simpleperf_mac-trunk_staging',
                  'simpleperf/darwin/x86_64/libsimpleperf_report.dylib',
                  'darwin/x86_64/libsimpleperf_report.dylib'),
 ]
@@ -154,7 +154,7 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '-b', '--branch', default='aosp-simpleperf-release',
+        '-b', '--branch', default='git_main-without-vendor',
         help='Branch to pull build from.')
     parser.add_argument('--build', required=True, help='Build number to pull.')
     parser.add_argument(
