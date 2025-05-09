@@ -804,14 +804,14 @@ class RecordingAppHelper {
       return success;
     };
     ProcessSymbolsInPerfDataFile(GetDataPath(), callback);
-    size_t sample_count = GetSampleCount();
     if (!success) {
       if (IsInEmulator()) {
-        // In emulator, the monitored app may not have a chance to run.
+        // In emulator, the main thread of the monitored app may not have a chance to run.
         constexpr size_t MIN_SAMPLES_TO_CHECK_SYMBOLS = 1000;
-        if (size_t sample_count = GetSampleCount(); sample_count < MIN_SAMPLES_TO_CHECK_SYMBOLS) {
-          GTEST_LOG_(INFO) << "Only " << sample_count
-                           << " samples recorded in the emulator. Skip checking symbols (need "
+        if (size_t sample_count = GetMainThreadSampleCount();
+            sample_count < MIN_SAMPLES_TO_CHECK_SYMBOLS) {
+          GTEST_LOG_(INFO) << "Only " << sample_count << " samples recorded for the main thread in"
+                           << " the emulator. Skip checking symbols (need "
                            << MIN_SAMPLES_TO_CHECK_SYMBOLS << " samples).";
           return true;
         }
@@ -826,7 +826,7 @@ class RecordingAppHelper {
   std::string GetDataPath() const { return perf_data_file_.path; }
 
  private:
-  size_t GetSampleCount() {
+  size_t GetMainThreadSampleCount() {
     size_t sample_count = 0;
     std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(GetDataPath());
     if (!reader) {
@@ -834,7 +834,10 @@ class RecordingAppHelper {
     }
     auto process_record = [&](std::unique_ptr<Record> r) {
       if (r->type() == PERF_RECORD_SAMPLE) {
-        sample_count++;
+        auto sr = static_cast<SampleRecord*>(r.get());
+        if (sr->tid_data.pid == sr->tid_data.tid) {
+          sample_count++;
+        }
       }
       return true;
     };
