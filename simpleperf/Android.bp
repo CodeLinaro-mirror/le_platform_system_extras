@@ -497,7 +497,6 @@ cc_library_shared {
     name: "libsimpleperf_report",
     defaults: [
         "simpleperf_static_libs",
-        "libdexfile_static_transitive_defaults",
     ],
     dist: {
         targets: ["simpleperf"],
