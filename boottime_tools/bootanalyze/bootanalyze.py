@@ -90,7 +90,8 @@ def main():
   cfg = yaml.load(args.config, Loader=yaml.SafeLoader)
 
   if args.stressfs:
-    if run_adb_cmd('install -r -g ' + args.stressfs) != 0:
+    _, err = run_adb_cmd('install -r -g ' + args.stressfs)
+    if err != 0:
       raise Exception('StressFS APK not installed')
 
   if args.iterate > 1 and args.bootchart:
@@ -879,24 +880,32 @@ def reboot(serial, use_stressfs, permissive, use_adb_reboot, adb_buffersize=None
 
   if adb_buffersize is not None:
     # increase the buffer size
-    if run_adb_cmd('logcat -G {}'.format(adb_buffersize)) != 0:
+    _, err = run_adb_cmd('logcat -G {}'.format(adb_buffersize))
+    if err != 0:
       debug('Fail to set logcat buffer size as {}'.format(adb_buffersize))
 
-'''
-Runs adb command. If do_return_result is true then output of command is
-returned otherwise an empty string is returned.
-'''
-def run_adb_cmd(cmd, do_return_result=False):
-  if do_return_result:
-    return subprocess.check_output(ADB_CMD + ' ' + cmd, shell=True).decode('utf-8', 'ignore').strip()
-  subprocess.call(ADB_CMD + ' ' + cmd, shell=True)
-  return ""
+def run_adb_cmd(cmd):
+  """Runs adb command and returns its result.
 
-def run_adb_shell_cmd(cmd, do_return_result=False):
-  return run_adb_cmd('shell ' + cmd, do_return_result)
+  Args:
+    cmd: the command to be run
 
-def run_adb_shell_cmd_as_root(cmd, do_return_result=False):
-  return run_adb_shell_cmd('su root ' + cmd, do_return_result)
+  Returns:
+    A tuple with the output of the command and the return code (zero if
+    successful).
+  """
+  try:
+    result = subprocess.check_output(ADB_CMD + ' ' + cmd, shell=True).decode(
+        'utf-8', 'ignore').strip()
+    return result, 0
+  except subprocess.CalledProcessError as err:
+    return err.output, err.returncode
+
+def run_adb_shell_cmd(cmd):
+  return run_adb_cmd('shell ' + cmd)
+
+def run_adb_shell_cmd_as_root(cmd):
+  return run_adb_shell_cmd('su root ' + cmd)
 
 def logcat_time_func(offset_year):
   def f(date_str):
