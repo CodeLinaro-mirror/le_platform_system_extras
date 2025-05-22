@@ -204,7 +204,7 @@ bool ETMRecorder::CheckSinkSupport() {
     } else if (name.find("trbe") != -1) {
       int cpu;
       if (android::base::ParseInt(&name[4], &cpu)) {
-        trbe_supported_cpus_.push_back(cpu);
+        trbe_supported_cpus_.insert(cpu);
         has_trbe_sink = true;
       }
     }
@@ -324,8 +324,7 @@ bool ETMRecorder::IsUsingTRBE(const perf_event_attr& attr, int cpu) const {
   if (attr.config2 != 0) {
     return false;
   }
-  return std::find(trbe_supported_cpus_.begin(), trbe_supported_cpus_.end(), cpu) !=
-         trbe_supported_cpus_.end();
+  return trbe_supported_cpus_.find(cpu) != trbe_supported_cpus_.end();
 }
 
 }  // namespace simpleperf
