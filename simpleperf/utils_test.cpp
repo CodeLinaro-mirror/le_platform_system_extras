@@ -73,6 +73,10 @@ TEST(utils, GetCpusFromString) {
   ASSERT_EQ(GetCpusFromString(""), std::nullopt);
   ASSERT_EQ(GetCpusFromString("-3"), std::nullopt);
   ASSERT_EQ(GetCpusFromString("3,2-1"), std::nullopt);
+  ASSERT_EQ("0-2", ToCpuString(std::set<int>({0, 1, 2})));
+  ASSERT_EQ("0,2-3", ToCpuString(std::set<int>({0, 2, 3})));
+  ASSERT_EQ("0-3,5,7-8", ToCpuString(std::set<int>({0, 1, 2, 3, 5, 7, 8})));
+  ASSERT_EQ("", ToCpuString(std::set<int>({})));
 }
 
 // @CddTest = 6.1/C-0-2

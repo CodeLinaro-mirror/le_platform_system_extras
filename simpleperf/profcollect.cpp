@@ -30,6 +30,7 @@
 #include "event_fd.h"
 #include "event_selection_set.h"
 #include "event_type.h"
+#include "utils.h"
 
 using namespace simpleperf;
 
@@ -54,10 +55,16 @@ bool IsETMDriverAvailable() {
 }
 
 bool IsETMDeviceAvailable() {
-  auto result = ETMRecorder::GetInstance().CheckEtmSupport();
+  auto result = ETMRecorder::GetInstance().CheckEtmSupport(false);
   if (!result.ok()) {
     LOG(INFO) << "HasDeviceSupport check failed: " << result.error();
     return false;
+  }
+  if (auto version = GetKernelVersion(); version && version.value() >= std::make_pair(6, 6)) {
+    if (ETMRecorder::GetInstance().GetCPUsHavingTRBESink().empty()) {
+      LOG(INFO) << "HasDeviceSupport check failed: requiring TRBE on >= 6.6 kernel";
+      return false;
+    }
   }
   const EventType* type = FindEventTypeByName("cs-etm", false);
   if (type == nullptr) {
@@ -83,6 +90,16 @@ static std::vector<std::string> ConvertArgs(const char** args, int arg_count) {
 
 bool RunRecordCmd(const char** args, int arg_count) {
   std::vector<std::string> cmd_args = ConvertArgs(args, arg_count);
+  // If TRBE is available, only record ETM data on cpus having TRBE.
+  auto check_etm_event = [](const std::string& s) { return s.find("cs-etm") != s.npos; };
+  if (std::find_if(cmd_args.begin(), cmd_args.end(), check_etm_event) != cmd_args.end()) {
+    const std::set<int>& cpus_having_trbe = ETMRecorder::GetInstance().GetCPUsHavingTRBESink();
+    if (!cpus_having_trbe.empty()) {
+      cmd_args.push_back("--cpu");
+      cmd_args.push_back(ToCpuString(cpus_having_trbe));
+    }
+  }
+
   LOG(INFO) << "Record " << android::base::Join(cmd_args, " ");
   // The kernel may panic when trying to hibernate or hotplug CPUs while collecting
   // ETM data. So get wakelock to keep the CPUs on.
