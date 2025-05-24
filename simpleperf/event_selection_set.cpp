@@ -182,6 +182,16 @@ bool IsKernelEventSupported() {
   return IsEventAttrSupported(attr, type->name);
 }
 
+static bool IsKernelUsingContiguousAuxBuffer() {
+  // Old kernels allocates contiguous pages for AUX buffer. This is changed by kernel patch
+  // "perf/aux: Allocate non-contiguous AUX pages by default". The patch is available on Android
+  // 6.6 kernel.
+  if (auto version = GetKernelVersion(); version && version.value() < std::make_pair(6, 6)) {
+    return true;
+  }
+  return false;
+}
+
 std::string AddrFilter::ToString() const {
   switch (type) {
     case FILE_RANGE:
@@ -235,9 +245,11 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
       return false;
     }
     ETMRecorder::GetInstance().SetEtmPerfEventAttr(event_type->event_type, selection->event_attr);
-    // The kernel (rb_allocate_aux) allocates high order of pages based on aux_watermark.
-    // To avoid that, use aux_watermark <= 1 page size.
-    selection->event_attr.aux_watermark = 4096;
+    if (IsKernelUsingContiguousAuxBuffer()) {
+      // The kernel (rb_allocate_aux) allocates high order of pages based on aux_watermark.
+      // To avoid that, use aux_watermark <= 1 page size.
+      selection->event_attr.aux_watermark = 4096;
+    }
   }
   bool set_default_sample_freq = false;
   if (!for_stat_cmd_) {

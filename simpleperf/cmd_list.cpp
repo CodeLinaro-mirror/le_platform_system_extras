@@ -35,6 +35,7 @@
 #include "event_fd.h"
 #include "event_selection_set.h"
 #include "event_type.h"
+#include "utils.h"
 
 namespace simpleperf {
 
@@ -78,8 +79,8 @@ static void RawEventTestThread(RawEventTestThreadArg* arg) {
 }
 
 struct RawEventSupportStatus {
-  std::vector<int> supported_cpus;
-  std::vector<int> may_supported_cpus;
+  std::set<int> supported_cpus;
+  std::set<int> may_supported_cpus;
 };
 
 #if defined(__riscv)
@@ -174,11 +175,9 @@ class RawEventSupportChecker {
       }
 
       if (supported) {
-        status.supported_cpus.insert(status.supported_cpus.end(), model.cpus.begin(),
-                                     model.cpus.end());
+        status.supported_cpus.insert(model.cpus.begin(), model.cpus.end());
       } else if (may_supported) {
-        status.may_supported_cpus.insert(status.may_supported_cpus.end(), model.cpus.begin(),
-                                         model.cpus.end());
+        status.may_supported_cpus.insert(model.cpus.begin(), model.cpus.end());
       }
     }
     return status;
@@ -258,30 +257,6 @@ class RawEventSupportChecker {
 
   std::vector<std::string> cpu_model_names_;
 };
-
-static std::string ToCpuString(const std::vector<int>& cpus) {
-  std::string s;
-  if (cpus.empty()) {
-    return s;
-  }
-  s += std::to_string(cpus[0]);
-  int last_cpu = cpus[0];
-  bool added = true;
-  for (size_t i = 1; i < cpus.size(); ++i) {
-    if (cpus[i] == last_cpu + 1) {
-      last_cpu = cpus[i];
-      added = false;
-    } else {
-      s += "-" + std::to_string(last_cpu) + "," + std::to_string(cpus[i]);
-      last_cpu = cpus[i];
-      added = true;
-    }
-  }
-  if (!added) {
-    s += "-" + std::to_string(last_cpu);
-  }
-  return s;
-}
 
 static void PrintRawEventTypes(const std::string& type_desc) {
   printf("List of %s:\n", type_desc.c_str());
