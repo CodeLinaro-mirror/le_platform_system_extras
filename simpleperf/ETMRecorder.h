@@ -20,6 +20,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 
 #include <android-base/expected.h>
 
@@ -69,6 +70,7 @@ class ETMRecorder {
   void SetRecordCycles(bool record);
   void SetCycleThreshold(size_t threshold);
   bool IsUsingTRBE(const perf_event_attr& attr, int cpu) const;
+  const std::set<int>& GetCPUsHavingTRBESink() const { return trbe_supported_cpus_; }
 
  private:
   bool ReadEtmInfo();
@@ -81,7 +83,7 @@ class ETMRecorder {
   bool has_trbe_sink = false;
   // select ETR device, setting in perf_event_attr->config2
   uint32_t etr_sink_config_ = 0;
-  std::vector<int> trbe_supported_cpus_;
+  std::set<int> trbe_supported_cpus_;
   // use EL2 PID tracing or not
   bool use_contextid2_ = false;
   // select etm options (timestamp, context_id, ...), setting in perf_event_attr->config
