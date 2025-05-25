@@ -411,7 +411,7 @@ bool BranchListProtoWriter::Write(const ETMBinaryMap& etm_data) {
 }
 
 bool BranchListProtoWriter::Write(const LBRData& lbr_data) {
-  if (!output_fp_ && !WriteHeader()) {
+  if (!is_header_written_ && !WriteHeader()) {
     return false;
   }
   proto::BranchList proto_branch_list;
@@ -458,6 +458,7 @@ bool BranchListProtoWriter::WriteHeader() {
   if (!WriteData(&compress, sizeof(compress))) {
     return false;
   }
+  is_header_written_ = true;
   return true;
 }
 
@@ -519,12 +520,13 @@ bool BranchListProtoReader::Read(ETMBinaryMap& etm_data, LBRData& lbr_data) {
     return false;
   }
   compress_ = compress == 1;
-  long file_offset = ftell(input_fp_.get());
-  if (file_offset == -1) {
-    PLOG(ERROR) << "failed to call ftell";
+  uint64_t file_offset = 0;
+  if (auto offset = GetCurrentOffset(); offset.has_value()) {
+    file_offset = offset.value();
+  } else {
     return false;
   }
-  uint64_t file_size = GetFileSize(input_filename_);
+  uint64_t file_size = GetTotalSize();
   while (file_offset < file_size) {
     uint32_t msg_size;
     if (!ReadData(&msg_size, sizeof(msg_size))) {
@@ -668,6 +670,25 @@ bool BranchListProtoReader::ReadOldFileFormat(ETMBinaryMap& etm_data, LBRData& l
     AddLBRData(proto_branch_list.lbr_data(), lbr_data);
   }
   return true;
+}
+
+std::optional<uint64_t> BranchListProtoReader::GetCurrentOffset() {
+  if (input_fp_) {
+    long file_offset = ftell(input_fp_.get());
+    if (file_offset == -1) {
+      PLOG(ERROR) << "failed to call ftell";
+      return std::nullopt;
+    }
+    return file_offset;
+  }
+  return input_str_pos_;
+}
+
+uint64_t BranchListProtoReader::GetTotalSize() {
+  if (input_fp_) {
+    return GetFileSize(input_filename_);
+  }
+  return input_str_.size();
 }
 
 bool DumpBranchListFile(std::string filename) {
