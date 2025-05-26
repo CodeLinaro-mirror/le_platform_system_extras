@@ -398,3 +398,15 @@ TEST(cmd_inject, check_missing_aux_data) {
   ASSERT_TRUE(android::base::ReadFileToString(tmpfile.path, &data));
   ASSERT_FALSE(data.empty());
 }
+
+// @CddTest = 6.1/C-0-2
+TEST(cmd_inject, perf_data_with_decode_etm_option) {
+  // Test reading perf.data generated with --decode-etm.
+  TemporaryFile tmpfile;
+  close(tmpfile.release());
+  ASSERT_TRUE(RunInjectCmd({"--output", "branch-list", "-i",
+                            GetTestData("etm/perf_etm_with_decode_etm.data"), "-o", tmpfile.path}));
+  std::string autofdo_data;
+  ASSERT_TRUE(RunInjectCmd({"-i", tmpfile.path, "--output", "autofdo"}, &autofdo_data));
+  CheckMatchingExpectedData("perf_inject.data", autofdo_data);
+}
