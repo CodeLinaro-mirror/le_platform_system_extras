@@ -43,7 +43,6 @@ buffers: {{
   size_kb: 260096
   fill_policy: RING_BUFFER
 }}
-
 data_sources: {{
   config {{
     name: "linux.process_stats"
@@ -52,21 +51,19 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.log"
     android_log_config {{
+      min_prio: PRIO_VERBOSE
     }}
   }}
 }}
-
 data_sources {{
   config {{
     name: "android.packages_list"
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.sys_stats"
@@ -105,14 +102,12 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.surfaceflinger.frametimeline"
     target_buffer: 2
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.ftrace"
@@ -185,7 +180,6 @@ data_sources {{
   }}
   producer_name_filter: "perfetto.traced_probes"
 }}
-
 duration_ms: 10000
 write_into_file: true
 file_write_period_ms: 5000
@@ -209,7 +203,6 @@ buffers: {{
   size_kb: 260096
   fill_policy: RING_BUFFER
 }}
-
 data_sources: {{
   config {{
     name: "linux.process_stats"
@@ -218,21 +211,19 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.log"
     android_log_config {{
+      min_prio: PRIO_VERBOSE
     }}
   }}
 }}
-
 data_sources {{
   config {{
     name: "android.packages_list"
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.sys_stats"
@@ -271,14 +262,12 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.surfaceflinger.frametimeline"
     target_buffer: 2
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.ftrace"
@@ -351,7 +340,6 @@ data_sources {{
   }}
   producer_name_filter: "perfetto.traced_probes"
 }}
-
 duration_ms: 10000
 write_into_file: true
 file_write_period_ms: 5000
