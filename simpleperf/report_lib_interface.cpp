@@ -255,7 +255,9 @@ class ReportLib {
     event_counters_view_.event_counter = event_counters_.data();
     return &event_counters_view_;
   }
-  const char* GetTracingDataOfCurrentSample() { return current_tracing_data_; }
+  const char* GetTracingDataOfCurrentSample() {
+    return current_tracing_data_.empty() ? nullptr : current_tracing_data_.data();
+  }
   const char* GetProcessNameOfCurrentSample() {
     const ThreadEntry* thread = thread_tree_.FindThread(current_sample_.pid);
     return (thread != nullptr) ? thread->comm : "unknown";
@@ -297,7 +299,7 @@ class ReportLib {
   CallChain current_callchain_;
   std::vector<EventCounter> event_counters_;
   EventCountersView event_counters_view_;
-  const char* current_tracing_data_;
+  std::vector<char> current_tracing_data_;
   std::vector<std::unique_ptr<Mapping>> current_mappings_;
   std::vector<CallChainEntry> callchain_entries_;
   std::string build_id_string_;
@@ -626,9 +628,9 @@ bool ReportLib::SetCurrentSample(std::unique_ptr<SampleRecord> sample_record) {
   current_event_.tracing_data_format = event.tracing_info.data_format;
   if (current_event_.tracing_data_format.size > 0u && (r.sample_type & PERF_SAMPLE_RAW)) {
     CHECK_GE(r.raw_data.size, current_event_.tracing_data_format.size);
-    current_tracing_data_ = r.raw_data.data;
+    current_tracing_data_.assign(r.raw_data.data, r.raw_data.data + r.raw_data.size);
   } else {
-    current_tracing_data_ = nullptr;
+    current_tracing_data_.clear();
   }
   SetEventCounters(r);
   return true;

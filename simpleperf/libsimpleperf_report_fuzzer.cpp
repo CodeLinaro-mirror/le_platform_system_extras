@@ -18,6 +18,7 @@
 #include <record_file.h>
 #include "command.h"
 #include "fuzzer/FuzzedDataProvider.h"
+#include "report_lib_interface.cpp"
 #include "test_util.h"
 
 using namespace simpleperf;
@@ -33,6 +34,7 @@ class SimplePerfReportFuzzer {
     const int32_t dataSize = mFdp.ConsumeIntegralInRange<int32_t>(0, (size * 80) / 100);
     std::vector<uint8_t> dataPointer = mFdp.ConsumeBytes<uint8_t>(dataSize);
     android::base::WriteFully(mTempfile.fd, dataPointer.data(), dataPointer.size());
+    android::base::WriteFully(mTempfileWholeData.fd, data, size);
     RegisterDumpRecordCommand();
   }
   void process();
@@ -40,18 +42,22 @@ class SimplePerfReportFuzzer {
  private:
   FuzzedDataProvider mFdp;
   TemporaryFile mTempfile;
-  void TestDumpCmd();
+  TemporaryFile mTempfileWholeData;
+  void TestPerfDataReader(const char* perf_data_path);
+  void TestDumpCmd(const char* perf_data_path);
+  void TestReportLib(const char* perf_data_path);
 };
 
-void SimplePerfReportFuzzer::TestDumpCmd() {
-  std::unique_ptr<Command> dump_cmd = CreateCommandInstance("dump");
-  CaptureStdout capture;
-  capture.Start();
-  dump_cmd->Run({"-i", mTempfile.path, "--dump-etm", "raw,packet,element"});
+void SimplePerfReportFuzzer::process() {
+  TestPerfDataReader(mTempfile.path);
+  TestDumpCmd(mTempfile.path);
+  // It is better to use whole data as input to report lib. Because the init corpuses are real
+  // recording files.
+  TestReportLib(mTempfileWholeData.path);
 }
 
-void SimplePerfReportFuzzer::process() {
-  std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(mTempfile.path);
+void SimplePerfReportFuzzer::TestPerfDataReader(const char* perf_data_path) {
+  std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(perf_data_path);
   if (!reader.get()) {
     return;
   }
@@ -76,8 +82,37 @@ void SimplePerfReportFuzzer::process() {
     });
     InvokeReader();
   }
-  TestDumpCmd();
   reader->Close();
+}
+
+void SimplePerfReportFuzzer::TestDumpCmd(const char* perf_data_path) {
+  std::unique_ptr<Command> dump_cmd = CreateCommandInstance("dump");
+  CaptureStdout capture;
+  capture.Start();
+  dump_cmd->Run({"-i", perf_data_path, "--dump-etm", "raw,packet,element"});
+}
+
+void SimplePerfReportFuzzer::TestReportLib(const char* perf_data_path) {
+  ReportLib report_lib;
+  if (!report_lib.SetRecordFile(perf_data_path)) {
+    return;
+  }
+  vector<char> raw_data;
+  while (true) {
+    Sample* sample = report_lib.GetNextSample();
+    if (sample == nullptr) {
+      break;
+    }
+    const char* tracing_data = report_lib.GetTracingDataOfCurrentSample();
+    Event* event = report_lib.GetEventOfCurrentSample();
+    if (event == nullptr) {
+      break;
+    }
+    if (event->tracing_data_format.size != 0) {
+      // Test if we can read tracing data.
+      raw_data.assign(tracing_data, tracing_data + event->tracing_data_format.size);
+    }
+  }
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
