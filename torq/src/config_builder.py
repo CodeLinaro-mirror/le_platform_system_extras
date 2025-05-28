@@ -210,13 +210,6 @@ def build_default_config(command, android_sdk_version):
           atrace_categories: "video"
           atrace_categories: "view"
           atrace_categories: "wm"
-          atrace_apps: "lmkd"
-          atrace_apps: "system_server"
-          atrace_apps: "com.android.systemui"
-          atrace_apps: "com.google.android.gms"
-          atrace_apps: "com.google.android.gms.persistent"
-          atrace_apps: "android:ui"
-          atrace_apps: "com.google.android.apps.maps"
           atrace_apps: "*"
           buffer_size_kb: 16384
           drain_period_ms: 150
@@ -348,6 +341,7 @@ def build_lightweight_config(command, android_sdk_version):
           atrace_categories: "wm"
           atrace_apps: "lmkd"
           atrace_apps: "system_server"
+          atrace_apps: "com.android.car"
           atrace_apps: "com.android.systemui"
           atrace_apps: "com.google.android.gms"
           atrace_apps: "com.google.android.gms.persistent"
@@ -381,7 +375,183 @@ def build_lightweight_config(command, android_sdk_version):
 
 
 def build_memory_config(command, android_sdk_version):
-  raise NotImplementedError
+  predefined_ftrace_events = [
+      "dmabuf_heap/dma_heap_stat",
+      "ftrace/print",
+      "gpu_mem/gpu_mem_total",
+      "ion/ion_stat",
+      "kmem/ion_heap_grow",
+      "kmem/ion_heap_shrink",
+      "kmem/rss_stat",
+      "lowmemorykiller/lowmemory_kill",
+      "mm_event/mm_event_record",
+      "oom/mark_victim",
+      "oom/oom_score_adj_update",
+      "sched/sched_blocked_reason",
+      "sched/sched_switch",
+      "sched/sched_wakeup",
+      "sched/sched_wakeup_new",
+      "sched/sched_waking",
+  ]
+  ftrace_events_string, error = create_ftrace_events_string(
+      predefined_ftrace_events, command.excluded_ftrace_events,
+      command.included_ftrace_events)
+  if error is not None:
+    return None, error
+  cpufreq_period_string = "cpufreq_period_ms: 500"
+  if android_sdk_version < ANDROID_SDK_VERSION_T:
+    cpufreq_period_string = ""
+  duration_string = ""
+  if command.dur_ms is not None:
+    duration_string = "duration_ms: %d" % command.dur_ms
+  config = f'''\
+    <<EOF
+
+    buffers: {{
+      size_kb: 4096
+      fill_policy: RING_BUFFER
+    }}
+    buffers {{
+      size_kb: 4096
+      fill_policy: RING_BUFFER
+    }}
+    buffers: {{
+      size_kb: 260096
+      fill_policy: RING_BUFFER
+    }}
+
+    data_sources: {{
+      config {{
+        name: "linux.process_stats"
+        process_stats_config {{
+          scan_all_processes_on_start: true
+        }}
+      }}
+    }}
+
+    data_sources: {{
+      config {{
+        name: "android.log"
+        android_log_config {{
+          min_prio: PRIO_ERROR
+        }}
+      }}
+    }}
+
+    data_sources {{
+      config {{
+        name: "android.packages_list"
+      }}
+    }}
+
+    data_sources: {{
+      config {{
+        name: "linux.sys_stats"
+        target_buffer: 1
+        sys_stats_config {{
+          stat_period_ms: 500
+          stat_counters: STAT_CPU_TIMES
+          stat_counters: STAT_FORK_COUNT
+          meminfo_period_ms: 1000
+          meminfo_counters: MEMINFO_ACTIVE_ANON
+          meminfo_counters: MEMINFO_ACTIVE_FILE
+          meminfo_counters: MEMINFO_INACTIVE_ANON
+          meminfo_counters: MEMINFO_INACTIVE_FILE
+          meminfo_counters: MEMINFO_KERNEL_STACK
+          meminfo_counters: MEMINFO_MLOCKED
+          meminfo_counters: MEMINFO_SHMEM
+          meminfo_counters: MEMINFO_SLAB
+          meminfo_counters: MEMINFO_SLAB_UNRECLAIMABLE
+          meminfo_counters: MEMINFO_VMALLOC_USED
+          meminfo_counters: MEMINFO_MEM_FREE
+          meminfo_counters: MEMINFO_SWAP_FREE
+          meminfo_counters: MEMINFO_MEM_AVAILABLE
+          meminfo_counters: MEMINFO_MEM_TOTAL
+          vmstat_period_ms: 1000
+          vmstat_counters: VMSTAT_NR_FREE_PAGES
+          vmstat_counters: VMSTAT_NR_ALLOC_BATCH
+          vmstat_counters: VMSTAT_NR_INACTIVE_ANON
+          vmstat_counters: VMSTAT_NR_ACTIVE_ANON
+          vmstat_counters: VMSTAT_PGFAULT
+          vmstat_counters: VMSTAT_PGMAJFAULT
+          vmstat_counters: VMSTAT_PGFREE
+          vmstat_counters: VMSTAT_PGPGIN
+          vmstat_counters: VMSTAT_PGPGOUT
+          vmstat_counters: VMSTAT_PSWPIN
+          vmstat_counters: VMSTAT_PSWPOUT
+          vmstat_counters: VMSTAT_PGSCAN_DIRECT
+          vmstat_counters: VMSTAT_PGSTEAL_DIRECT
+          vmstat_counters: VMSTAT_PGSCAN_KSWAPD
+          vmstat_counters: VMSTAT_PGSTEAL_KSWAPD
+          vmstat_counters: VMSTAT_WORKINGSET_REFAULT
+          {cpufreq_period_string}
+        }}
+      }}
+    }}
+
+    data_sources {{
+      config {{
+        name: "android.java_hprof"
+        target_buffer: 2
+        java_hprof_config {{
+          process_cmdline: "system_server"
+        }}
+      }}
+    }}
+
+    data_sources: {{
+      config {{
+        name: "linux.ftrace"
+        target_buffer: 2
+        ftrace_config {{
+          {ftrace_events_string}
+          atrace_categories: "aidl"
+          atrace_categories: "am"
+          atrace_categories: "binder_lock"
+          atrace_categories: "binder_driver"
+          atrace_categories: "dalvik"
+          atrace_categories: "disk"
+          atrace_categories: "freq"
+          atrace_categories: "idle"
+          atrace_categories: "gfx"
+          atrace_categories: "hal"
+          atrace_categories: "input"
+          atrace_categories: "pm"
+          atrace_categories: "power"
+          atrace_categories: "res"
+          atrace_categories: "rro"
+          atrace_categories: "sched"
+          atrace_categories: "sm"
+          atrace_categories: "ss"
+          atrace_categories: "view"
+          atrace_categories: "wm"
+          atrace_apps: "*"
+          buffer_size_kb: 16384
+          drain_period_ms: 150
+          symbolize_ksyms: true
+        }}
+      }}
+    }}
+
+    data_sources {{
+      config {{
+        name: "perfetto.metatrace"
+        target_buffer: 2
+      }}
+      producer_name_filter: "perfetto.traced_probes"
+    }}
+
+    {duration_string}
+    write_into_file: true
+    file_write_period_ms: 5000
+    max_file_size_bytes: 100000000000
+    flush_period_ms: 5000
+    incremental_state_config {{
+      clear_period_ms: 5000
+    }}
+
+    EOF'''
+  return textwrap.dedent(config), None
 
 
 PREDEFINED_PERFETTO_CONFIGS = {

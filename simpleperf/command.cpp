@@ -220,8 +220,7 @@ void RegisterAllCommands() {
 
 static void StderrLogger(android::base::LogId, android::base::LogSeverity severity, const char*,
                          const char* file, unsigned int line, const char* message) {
-  static const char log_characters[] = "VDIWEFF";
-  char severity_char = log_characters[severity];
+  char severity_char = android::base::kSeverityChars[severity];
   fprintf(stderr, "simpleperf %c %s:%u] %s\n", severity_char, file, line, message);
 }
 
