@@ -410,6 +410,39 @@ std::optional<std::set<int>> GetCpusFromString(const std::string& s) {
   return cpus;
 }
 
+std::string ToCpuString(const std::set<int>& cpus) {
+  if (cpus.empty()) {
+    return "";
+  }
+  auto it = cpus.begin();
+  int cpu1 = -1;
+  int cpu2 = -1;
+  std::string s;
+  auto add_cpu_range = [&]() {
+    if (!s.empty()) {
+      s.push_back(',');
+    }
+    if (cpu1 == cpu2) {
+      s += std::to_string(cpu1);
+    } else {
+      s += std::to_string(cpu1) + "-" + std::to_string(cpu2);
+    }
+  };
+
+  for (int cpu : cpus) {
+    if (cpu1 == -1) {
+      cpu1 = cpu2 = cpu;
+    } else if (cpu2 + 1 == cpu) {
+      cpu2 = cpu;
+    } else {
+      add_cpu_range();
+      cpu1 = cpu2 = cpu;
+    }
+  }
+  add_cpu_range();
+  return s;
+}
+
 std::optional<std::set<pid_t>> GetTidsFromString(const std::string& s, bool check_if_exists) {
   std::set<pid_t> tids;
   for (const auto& p : Split(s, ",")) {

@@ -211,6 +211,7 @@ class BranchListProtoWriter {
   const size_t max_branches_per_message_;
   std::unique_ptr<FILE, decltype(&fclose)> output_fp_;
   std::string* output_str_;
+  bool is_header_written_ = false;
 };
 
 class BranchListProtoReader {
@@ -228,6 +229,8 @@ class BranchListProtoReader {
   void Rewind();
   bool ReadData(void* data, size_t size);
   bool ReadOldFileFormat(ETMBinaryMap& etm_data, LBRData& lbr_data);
+  std::optional<uint64_t> GetCurrentOffset();
+  uint64_t GetTotalSize();
 
   const std::string input_filename_;
   std::unique_ptr<FILE, decltype(&fclose)> input_fp_;

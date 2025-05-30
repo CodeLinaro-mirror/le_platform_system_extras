@@ -436,9 +436,14 @@ bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
             break;
           }
           has_etm_events_ = true;
-          if (!ETMRecorder::GetInstance().IsUsingTRBE(fd->attr(), fd->Cpu())) {
-            etm_with_etr_fds_.push_back(fd);
-          }
+          // Ideally we only need to periodically disable and enable event fds to flush ETM data
+          // for ETR. Because TRBE has an interrupt to move ETM data automatically on buffer
+          // overflow. However, TRBE driver lacks a patch of handling CPU idle. As a result, TRBE
+          // can lose power in CPU idle, and we can no longer get ETM data after that. So before
+          // the kernel patch is available (which is currently in review in
+          // https://lists.infradead.org/pipermail/linux-arm-kernel/2025-May/1028966.html), we need
+          // a workaround to also periodically disable and enable event fds for TRBE.
+          etm_with_etr_fds_.push_back(fd);
         }
         cpu_map[fd->Cpu()] = fd;
       } else {

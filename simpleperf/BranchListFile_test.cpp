@@ -149,6 +149,24 @@ TEST(BranchListProtoReaderWriter, smoke) {
       ASSERT_TRUE(IsLBRDataEqual(lbr_data, new_lbr_data));
     }
   }
+
+  for (size_t max_branches_per_message : {100, 100000000}) {
+    for (bool compress : {false, true}) {
+      std::string s;
+      auto writer = BranchListProtoWriter::CreateForString(&s, compress, max_branches_per_message);
+      ASSERT_TRUE(writer);
+      ASSERT_TRUE(writer->Write(etm_data));
+      ASSERT_TRUE(writer->Write(lbr_data));
+      writer = nullptr;
+      auto reader = BranchListProtoReader::CreateForString(s);
+      ASSERT_TRUE(reader);
+      ETMBinaryMap new_etm_data;
+      LBRData new_lbr_data;
+      ASSERT_TRUE(reader->Read(new_etm_data, new_lbr_data));
+      ASSERT_TRUE(IsETMDataEqual(etm_data, new_etm_data));
+      ASSERT_TRUE(IsLBRDataEqual(lbr_data, new_lbr_data));
+    }
+  }
 }
 
 // @CddTest = 6.1/C-0-2
