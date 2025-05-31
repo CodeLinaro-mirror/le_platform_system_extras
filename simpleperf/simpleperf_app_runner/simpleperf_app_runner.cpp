@@ -124,40 +124,61 @@ static void CheckSimpleperfArguments(std::string_view cmd_name, char** args) {
   }
 
   for (size_t i = 0; args[i] != nullptr; ++i) {
-    auto it = formats->find(args[i]);
+    std::string option = args[i];
+    std::string option_value;
+    auto it = formats->find(option);
     if (it == formats->end()) {
-      it = common_formats.find(args[i]);
+      if (auto pos = option.find("="); pos != std::string::npos) {
+        option_value = option.substr(pos + 1);
+        option.resize(pos);
+        it = formats->find(option);
+      }
+      it = common_formats.find(option);
       if (it == common_formats.end()) {
-        error(1, 0, "arg isn't allowed: %s", args[i]);
+        error(1, 0, "arg isn't allowed: %s", option.c_str());
       }
     }
     const OptionFormat& format = it->second;
-    if (format.value_type != OptionValueType::NONE && args[i + 1] == nullptr) {
-      error(1, 0, "invalid arg: %s", args[i]);
+    switch (format.value_type) {
+      case OptionValueType::NONE:
+        break;
+      case OptionValueType::OPT_STRING:
+        if (args[i + 1] != nullptr && args[i + 1][0] != '-') {
+          option_value = args[++i];
+        }
+        break;
+      case OptionValueType::OPT_STRING_AFTER_EQUAL:
+        break;
+      case OptionValueType::STRING:
+      case OptionValueType::UINT:
+      case OptionValueType::DOUBLE:
+        if (args[i + 1] == nullptr) {
+          error(1, 0, "arg missing value: %s", option.c_str());
+        }
+        option_value = args[++i];
+        break;
     }
+
     switch (format.app_runner_type) {
       case AppRunnerType::ALLOWED:
         break;
       case AppRunnerType::NOT_ALLOWED:
-        error(1, 0, "arg isn't allowed: %s", args[i]);
+        error(1, 0, "arg isn't allowed: %s", option.c_str());
         break;
       case AppRunnerType::CHECK_FD: {
         int fd;
-        if (!ParseInt(args[i + 1], &fd) || fd < 3 || fcntl(fd, F_GETFD) == -1) {
-          error(1, 0, "invalid fd for arg: %s", args[i]);
+        if (!ParseInt(option_value, &fd) || fd < 3 || fcntl(fd, F_GETFD) == -1) {
+          error(1, 0, "invalid fd for arg: %s", option.c_str());
         }
         break;
       }
       case AppRunnerType::CHECK_PATH: {
         std::string path;
-        if (!Realpath(args[i + 1], &path) || !StartsWith(path, "/data/local/tmp/")) {
-          error(1, 0, "invalid path for arg: %s", args[i]);
+        if (!Realpath(option_value, &path) || !StartsWith(path, "/data/local/tmp/")) {
+          error(1, 0, "invalid path for arg: %s", option.c_str());
         }
         break;
       }
-    }
-    if (format.value_type != OptionValueType::NONE) {
-      ++i;
     }
   }
 }

@@ -170,13 +170,6 @@ data_sources: {{
       atrace_categories: "video"
       atrace_categories: "view"
       atrace_categories: "wm"
-      atrace_apps: "lmkd"
-      atrace_apps: "system_server"
-      atrace_apps: "com.android.systemui"
-      atrace_apps: "com.google.android.gms"
-      atrace_apps: "com.google.android.gms.persistent"
-      atrace_apps: "android:ui"
-      atrace_apps: "com.google.android.apps.maps"
       atrace_apps: "*"
       buffer_size_kb: 16384
       drain_period_ms: 150
@@ -343,13 +336,6 @@ data_sources: {{
       atrace_categories: "video"
       atrace_categories: "view"
       atrace_categories: "wm"
-      atrace_apps: "lmkd"
-      atrace_apps: "system_server"
-      atrace_apps: "com.android.systemui"
-      atrace_apps: "com.google.android.gms"
-      atrace_apps: "com.google.android.gms.persistent"
-      atrace_apps: "android:ui"
-      atrace_apps: "com.google.android.apps.maps"
       atrace_apps: "*"
       buffer_size_kb: 16384
       drain_period_ms: 150
