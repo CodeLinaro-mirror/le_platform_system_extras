@@ -884,5 +884,27 @@ class DeviceUnitTest(unittest.TestCase):
     self.assertEqual(error.message, "Simpleperf was not found in the device")
     self.assertEqual(error.suggestion, "Push the simpleperf binary to the device")
 
+  @mock.patch.object(subprocess, "run", autospec=True)
+  def test_file_exists_success(self, mock_subprocess_run):
+    mock_subprocess_run.return_value = (
+        self.generate_mock_completed_process(
+            b'',
+            b'')
+    )
+    adbDevice = AdbDevice(TEST_DEVICE_SERIAL)
+
+    self.assertEqual(adbDevice.file_exists("perfetto"), True)
+
+  @mock.patch.object(subprocess, "run", autospec=True)
+  def test_file_exists_failure(self, mock_subprocess_run):
+    mock_subprocess_run.return_value = (
+        self.generate_mock_completed_process(
+            b'',
+            b'ls: /data/misc: No such file or directory\n')
+    )
+    adbDevice = AdbDevice(TEST_DEVICE_SERIAL)
+
+    self.assertEqual(adbDevice.file_exists("perfetto"), False)
+
 if __name__ == '__main__':
   unittest.main()
