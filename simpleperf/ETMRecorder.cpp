@@ -106,13 +106,9 @@ void ETMRecorder::BuildEventTypes(std::set<EventType>& event_types) {
   if (etm_event_type == -1) {
     return;
   }
-  if (CheckSinkSupport()) {
-    event_types.emplace("cs-etm", etm_event_type, 0, "Coresight ETM instruction tracing", "arm");
-    if (has_etr_sink) {
-      event_types.emplace("cs-etm/@tmc_etr0/", etm_event_type, 0,
-                          "Coresight ETM instruction tracing (via ETR)", "arm");
-    }
-  }
+  event_types.emplace("cs-etm", etm_event_type, 0, "Coresight ETM instruction tracing", "arm");
+  event_types.emplace("cs-etm/@tmc_etr0/", etm_event_type, 0,
+                      "Coresight ETM instruction tracing (via ETR)", "arm");
 }
 
 bool ETMRecorder::IsETMDriverAvailable() {
@@ -138,8 +134,10 @@ expected<bool, std::string> ETMRecorder::CheckEtmSupport(bool need_etr) {
     }
   }
   bool has_sink = CheckSinkSupport();
-  if (need_etr && !has_etr_sink) {
-    // Trigger a manual probe of etr. Then wait and recheck.
+  if (!has_sink || (need_etr && !has_etr_sink)) {
+    // Trigger a manual ETR probe under the following two cases:
+    // 1. No ETR or TRBE sinks were found.
+    // 2. An ETR sink is required but no ETR sinks were found.
     std::string prop_name = "profcollectd.etr.probe";
     bool res = android::base::SetProperty(prop_name, "1");
     if (!res) {
@@ -147,7 +145,7 @@ expected<bool, std::string> ETMRecorder::CheckEtmSupport(bool need_etr) {
     }
     usleep(200000);  // Wait for 200ms.
     has_sink = CheckSinkSupport();
-    if (!has_etr_sink) {
+    if (need_etr && !has_etr_sink) {
       return unexpected("can't find etr device, which moves etm data to memory");
     }
   }
