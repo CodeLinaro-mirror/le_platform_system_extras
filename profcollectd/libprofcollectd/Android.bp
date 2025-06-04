@@ -47,7 +47,7 @@ rust_library {
         "libchrono",
         "liblog_rust",
         "libmacaddr",
-        "librand-0.8",
+        "librand",
         "librustutils",
         "libserde",
         "libserde_json",
