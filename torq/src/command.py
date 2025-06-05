@@ -22,6 +22,7 @@ from .validation_error import ValidationError
 from .open_ui import open_trace
 
 ANDROID_SDK_VERSION_T = 33
+PERFETTO_DEVICE_TRACE_FOLDER = "/data/misc/perfetto-traces"
 
 class Command(ABC):
   """
@@ -82,6 +83,9 @@ class ProfilerCommand(Command):
 
   def validate(self, device):
     print("Further validating arguments of ProfilerCommand.")
+    error = self.validate_trace_folder(device)
+    if error is not None:
+      return error
     if self.simpleperf_event is not None:
       error = device.simpleperf_event_exists(self.simpleperf_event)
       if error is not None:
@@ -137,6 +141,15 @@ class ProfilerCommand(Command):
                              ("Run 'adb -s %s shell am force-stop %s' to close"
                               " the package %s before trying to start it."
                               % (device.serial, self.app, self.app)))
+    return None
+
+  def validate_trace_folder(self, device):
+    if not device.file_exists(PERFETTO_DEVICE_TRACE_FOLDER):
+      return ValidationError("%s folder does not exist on device with"
+                             " serial %s." % (PERFETTO_DEVICE_TRACE_FOLDER,
+                                              device.serial),
+                             "Make sure that your device has %s properly"
+                             " configured." % self.profiler.capitalize())
     return None
 
 

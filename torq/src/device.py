@@ -120,6 +120,11 @@ class AdbDevice:
   def remove_file(self, file_path):
     subprocess.run(["adb", "-s", self.serial, "shell", "rm", "-f", file_path])
 
+  def file_exists(self, file):
+    process = subprocess.run(["adb", "-s", self.serial, "shell", "ls",
+                              file], capture_output=True)
+    return not "No such file or directory" in process.stderr.decode("utf-8")
+
   def start_perfetto_trace(self, config):
     return subprocess.Popen(("adb -s %s shell perfetto -c - --txt -o"
                              " /data/misc/perfetto-traces/"
