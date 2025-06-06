@@ -25,6 +25,7 @@
 #include <include/simpleperf_profcollect.hpp>
 
 #include "ETMRecorder.h"
+#include "android-base/logging.h"
 #include "command.h"
 #include "event_attr.h"
 #include "event_fd.h"
@@ -127,8 +128,7 @@ static android::base::LogFunction saved_log_func;
 static void FileLogger(android::base::LogId id, android::base::LogSeverity severity,
                        const char* tag, const char* file, unsigned int line, const char* message) {
   if (log_fd.ok()) {
-    static const char log_characters[] = "VDIWEFF";
-    char severity_char = log_characters[severity];
+    char severity_char = android::base::kSeverityChars[severity];
     struct tm now;
     time_t t = time(nullptr);
     localtime_r(&t, &now);

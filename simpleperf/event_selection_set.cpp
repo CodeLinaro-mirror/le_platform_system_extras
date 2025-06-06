@@ -244,6 +244,13 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
       LOG(ERROR) << result.error();
       return false;
     }
+#if defined(__ANDROID__)
+    // To prevent KASLR disclosure, disallow recording kernel ETM data for profileable apps.
+    if (!selection->event_attr.exclude_kernel && IsInAppUid()) {
+      LOG(ERROR) << "Can't record kernel ETM data from app uid.";
+      return false;
+    }
+#endif
     ETMRecorder::GetInstance().SetEtmPerfEventAttr(event_type->event_type, selection->event_attr);
     if (IsKernelUsingContiguousAuxBuffer()) {
       // The kernel (rb_allocate_aux) allocates high order of pages based on aux_watermark.
