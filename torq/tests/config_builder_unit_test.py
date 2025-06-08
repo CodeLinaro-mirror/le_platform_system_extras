@@ -17,7 +17,8 @@
 import unittest
 import builtins
 from unittest import mock
-from src.config_builder import build_default_config, build_custom_config, build_lightweight_config
+from src.config_builder import (build_default_config, build_custom_config,
+                                build_lightweight_config, build_memory_config)
 from src.command import ProfilerCommand
 from src.torq import DEFAULT_DUR_MS
 
@@ -113,13 +114,6 @@ COMMON_DEFAULT_ATRACE_EVENTS = f'''\
       atrace_categories: "video"
       atrace_categories: "view"
       atrace_categories: "wm"
-      atrace_apps: "lmkd"
-      atrace_apps: "system_server"
-      atrace_apps: "com.android.systemui"
-      atrace_apps: "com.google.android.gms"
-      atrace_apps: "com.google.android.gms.persistent"
-      atrace_apps: "android:ui"
-      atrace_apps: "com.google.android.apps.maps"
       atrace_apps: "*"'''
 
 COMMON_DEFAULT_CONFIG_BEGINNING_STRING = f'''\
@@ -276,11 +270,127 @@ data_sources: {{
       atrace_categories: "wm"
       atrace_apps: "lmkd"
       atrace_apps: "system_server"
+      atrace_apps: "com.android.car"
       atrace_apps: "com.android.systemui"
       atrace_apps: "com.google.android.gms"
       atrace_apps: "com.google.android.gms.persistent"
       atrace_apps: "android:ui"
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
+duration_ms: {TEST_DUR_MS}
+{COMMON_CONFIG_ENDING_STRING}EOF'''
+
+
+MEMORY_CONFIG_9000_DUR_MS = f'''\
+{COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_ERROR
+{COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
+      stat_period_ms: 500
+      stat_counters: STAT_CPU_TIMES
+      stat_counters: STAT_FORK_COUNT
+      meminfo_period_ms: 1000
+      meminfo_counters: MEMINFO_ACTIVE_ANON
+      meminfo_counters: MEMINFO_ACTIVE_FILE
+      meminfo_counters: MEMINFO_INACTIVE_ANON
+      meminfo_counters: MEMINFO_INACTIVE_FILE
+      meminfo_counters: MEMINFO_KERNEL_STACK
+      meminfo_counters: MEMINFO_MLOCKED
+      meminfo_counters: MEMINFO_SHMEM
+      meminfo_counters: MEMINFO_SLAB
+      meminfo_counters: MEMINFO_SLAB_UNRECLAIMABLE
+      meminfo_counters: MEMINFO_VMALLOC_USED
+      meminfo_counters: MEMINFO_MEM_FREE
+      meminfo_counters: MEMINFO_SWAP_FREE
+      meminfo_counters: MEMINFO_MEM_AVAILABLE
+      meminfo_counters: MEMINFO_MEM_TOTAL
+      vmstat_period_ms: 1000
+      vmstat_counters: VMSTAT_NR_FREE_PAGES
+      vmstat_counters: VMSTAT_NR_ALLOC_BATCH
+      vmstat_counters: VMSTAT_NR_INACTIVE_ANON
+      vmstat_counters: VMSTAT_NR_ACTIVE_ANON
+      vmstat_counters: VMSTAT_PGFAULT
+      vmstat_counters: VMSTAT_PGMAJFAULT
+      vmstat_counters: VMSTAT_PGFREE
+      vmstat_counters: VMSTAT_PGPGIN
+      vmstat_counters: VMSTAT_PGPGOUT
+      vmstat_counters: VMSTAT_PSWPIN
+      vmstat_counters: VMSTAT_PSWPOUT
+      vmstat_counters: VMSTAT_PGSCAN_DIRECT
+      vmstat_counters: VMSTAT_PGSTEAL_DIRECT
+      vmstat_counters: VMSTAT_PGSCAN_KSWAPD
+      vmstat_counters: VMSTAT_PGSTEAL_KSWAPD
+      vmstat_counters: VMSTAT_WORKINGSET_REFAULT
+{CPUFREQ_STRING_NEW_ANDROID}
+    }}
+  }}
+}}
+
+data_sources {{
+  config {{
+    name: "android.java_hprof"
+    target_buffer: 2
+    java_hprof_config {{
+      process_cmdline: "system_server"
+    }}
+  }}
+}}
+
+data_sources: {{
+  config {{
+    name: "linux.ftrace"
+    target_buffer: 2
+    ftrace_config {{
+      ftrace_events: "dmabuf_heap/dma_heap_stat"
+      ftrace_events: "ftrace/print"
+      ftrace_events: "gpu_mem/gpu_mem_total"
+      ftrace_events: "ion/ion_stat"
+      ftrace_events: "kmem/ion_heap_grow"
+      ftrace_events: "kmem/ion_heap_shrink"
+      ftrace_events: "kmem/rss_stat"
+      ftrace_events: "lowmemorykiller/lowmemory_kill"
+      ftrace_events: "mm_event/mm_event_record"
+      ftrace_events: "oom/mark_victim"
+      ftrace_events: "oom/oom_score_adj_update"
+      ftrace_events: "sched/sched_blocked_reason"
+      ftrace_events: "sched/sched_switch"
+      ftrace_events: "sched/sched_wakeup"
+      ftrace_events: "sched/sched_wakeup_new"
+      ftrace_events: "sched/sched_waking"
+      atrace_categories: "aidl"
+      atrace_categories: "am"
+      atrace_categories: "binder_lock"
+      atrace_categories: "binder_driver"
+      atrace_categories: "dalvik"
+      atrace_categories: "disk"
+      atrace_categories: "freq"
+      atrace_categories: "idle"
+      atrace_categories: "gfx"
+      atrace_categories: "hal"
+      atrace_categories: "input"
+      atrace_categories: "pm"
+      atrace_categories: "power"
+      atrace_categories: "res"
+      atrace_categories: "rro"
+      atrace_categories: "sched"
+      atrace_categories: "sm"
+      atrace_categories: "ss"
+      atrace_categories: "view"
+      atrace_categories: "wm"
+      atrace_apps: "*"
+      buffer_size_kb: 16384
+      drain_period_ms: 150
+      symbolize_ksyms: true
+    }}
+  }}
+}}
+
+data_sources {{
+  config {{
+    name: "perfetto.metatrace"
+    target_buffer: 2
+  }}
+  producer_name_filter: "perfetto.traced_probes"
+}}
+
 duration_ms: {TEST_DUR_MS}
 {COMMON_CONFIG_ENDING_STRING}EOF'''
 
@@ -450,6 +560,15 @@ class ConfigBuilderUnitTest(unittest.TestCase):
 
     self.assertEqual(error, None)
     self.assertEqual(config, LIGHTWEIGHT_CONFIG_9000_DUR_MS)
+
+  def test_build_memory_config_setting_valid_dur_ms(self):
+    self.maxDiff = None
+    self.command.dur_ms = TEST_DUR_MS
+
+    config, error = build_memory_config(self.command, ANDROID_SDK_VERSION_T)
+
+    self.assertEqual(error, None)
+    self.assertEqual(config, MEMORY_CONFIG_9000_DUR_MS)
 
   def test_build_default_config_on_old_android_version(self):
     config, error = build_default_config(self.command, ANDROID_SDK_VERSION_S_V2)
