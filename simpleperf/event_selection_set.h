@@ -174,6 +174,11 @@ class EventSelectionSet {
   bool FinishReadMmapEventData();
   void CloseEventFiles();
 
+  // Functions for reading COMM records only, for updating thread names for the stat command.
+  void SetOnlyRecordingThreadNames();
+  bool MmapEventFilesForThreadNames(const std::set<pid_t>& threads, size_t mmap_pages);
+  bool ReadThreadNameRecords(const std::function<bool(Record*)>& callback);
+
   const simpleperf::RecordStat& GetRecordStat() { return record_read_thread_->GetStat(); }
 
   // Stop profiling if all monitored processes/threads don't exist.
@@ -220,6 +225,8 @@ class EventSelectionSet {
   bool CheckMonitoredTargets();
   bool HasSampler();
 
+  EventSelection& GetFirstEventSelection();
+
   const bool for_stat_cmd_;
 
   std::vector<EventSelectionGroup> groups_;
@@ -238,6 +245,9 @@ class EventSelectionSet {
 
   std::set<int> etm_event_cpus_;
   std::set<int>::const_iterator etm_event_cpus_it_;
+
+  // Mapping from cpu to the event_fd created mapped buffer (for thread name records) on that cpu.
+  std::unordered_map<int, EventFd*> thread_name_mapped_event_fds_;
 
   DISALLOW_COPY_AND_ASSIGN(EventSelectionSet);
 };
