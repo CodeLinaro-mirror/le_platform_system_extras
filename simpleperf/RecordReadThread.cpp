@@ -503,10 +503,6 @@ bool RecordReadThread::HandleRemoveEventFds(const std::vector<EventFd*>& event_f
   return true;
 }
 
-static bool CompareRecordTime(KernelRecordReader* r1, KernelRecordReader* r2) {
-  return r1->RecordTime() > r2->RecordTime();
-}
-
 // When reading from mmap buffers, we prefer reading from all buffers at once rather than reading
 // one buffer at a time. Because by reading all buffers at once, we can merge records from
 // different buffers easily in memory. Otherwise, we have to sort records with greater effort.

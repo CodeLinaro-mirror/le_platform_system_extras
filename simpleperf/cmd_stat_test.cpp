@@ -371,10 +371,27 @@ TEST(stat_cmd, use_devfreq_counters_option) {
 #endif
 }
 
+static void RunThreadNameChangeFunction() {
+  // Change thread name during the work.
+  usleep(500000);
+  pthread_setname_np(pthread_self(), "ThreadNameWork");
+  usleep(500000);
+}
+
 // @CddTest = 6.1/C-0-2
 TEST(stat_cmd, per_thread_option) {
   ASSERT_TRUE(StatCmd()->Run({"--per-thread", "sleep", "0.1"}));
   TEST_IN_ROOT(StatCmd()->Run({"--per-thread", "-a", "--duration", "0.1"}));
+
+  // Test if we can report using up-to-date thread names.
+  auto workload = Workload::CreateWorkload(RunThreadNameChangeFunction);
+  ASSERT_TRUE(workload != nullptr);
+  ASSERT_TRUE(workload->Start());
+  CaptureStdout capture;
+  ASSERT_TRUE(capture.Start());
+  ASSERT_TRUE(StatCmd()->Run({"--per-thread", "-p", std::to_string(workload->GetPid())}));
+  std::string output = capture.Finish();
+  ASSERT_TRUE(output.find("ThreadNameWork") != output.npos) << output;
 }
 
 // @CddTest = 6.1/C-0-2
