@@ -959,6 +959,94 @@ bool EventSelectionSet::FinishReadMmapEventData() {
   return ReadMmapEventData(false);
 }
 
+EventSelectionSet::EventSelection& EventSelectionSet::GetFirstEventSelection() {
+  CHECK(!groups_.empty());
+  CHECK(!groups_[0].selections.empty());
+  return groups_[0].selections[0];
+}
+
+void EventSelectionSet::SetOnlyRecordingThreadNames() {
+  EventSelection& event = GetFirstEventSelection();
+  event.event_attr.comm = 1;
+  event.event_attr.mmap = 0;
+  event.event_attr.mmap2 = 0;
+  event.event_attr.freq = 0;
+  event.event_attr.sample_period = INT64_MAX;
+  // Set sample_type to 0 to avoid triggering samples from software events.
+  event.event_attr.sample_type = 0;
+}
+
+bool EventSelectionSet::MmapEventFilesForThreadNames(const std::set<pid_t>& threads,
+                                                     size_t mmap_pages) {
+  EventSelection& event = GetFirstEventSelection();
+  for (auto& fd : event.event_fds) {
+    if (threads.count(fd->ThreadId()) == 1) {
+      int cpu = fd->Cpu();
+      auto it = thread_name_mapped_event_fds_.find(cpu);
+      if (it == thread_name_mapped_event_fds_.end()) {
+        if (!fd->CreateMappedBuffer(mmap_pages, true)) {
+          return false;
+        }
+        thread_name_mapped_event_fds_[cpu] = fd.get();
+      } else {
+        if (!fd->ShareMappedBuffer(*(it->second), true)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool EventSelectionSet::ReadThreadNameRecords(const std::function<bool(Record*)>& callback) {
+  std::vector<KernelRecordReader> kernel_record_readers;
+  for (auto& pair : thread_name_mapped_event_fds_) {
+    kernel_record_readers.emplace_back(pair.second);
+  }
+  std::vector<KernelRecordReader*> readers;
+  for (auto& reader : kernel_record_readers) {
+    if (reader.GetDataFromKernelBuffer()) {
+      readers.push_back(&reader);
+    }
+  }
+  if (readers.empty()) {
+    return true;
+  }
+
+  const perf_event_attr& attr = readers[0]->GetEventFd()->attr();
+  RecordParser record_parser(attr);
+  std::vector<char> buffer;
+  auto process_record = [&](KernelRecordReader* reader) {
+    const perf_event_header& header = reader->RecordHeader();
+    if (buffer.size() < header.size) {
+      buffer.resize(header.size);
+    }
+    reader->ReadRecord(0, header.size, buffer.data());
+    std::unique_ptr<Record> r =
+        ReadRecordFromBuffer(attr, buffer.data(), buffer.data() + header.size);
+    return r && callback(r.get());
+  };
+
+  // Use heap to process records in time order.
+  for (auto& reader : readers) {
+    reader->MoveToNextRecord(record_parser);
+  }
+  std::make_heap(readers.begin(), readers.end(), CompareRecordTime);
+  size_t size = readers.size();
+  while (size > 0) {
+    std::pop_heap(readers.begin(), readers.begin() + size, CompareRecordTime);
+    if (!process_record(readers[size - 1])) {
+      return false;
+    }
+    if (readers[size - 1]->MoveToNextRecord(record_parser)) {
+      std::push_heap(readers.begin(), readers.begin() + size, CompareRecordTime);
+    } else {
+      size--;
+    }
+  }
+  return true;
+}
+
 void EventSelectionSet::CloseEventFiles() {
   if (record_read_thread_) {
     record_read_thread_->StopReadThread();
