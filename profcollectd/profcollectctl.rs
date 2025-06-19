@@ -16,51 +16,50 @@
 
 //! Command to control profcollectd behaviour.
 
-use anyhow::{bail, Context, Result};
-use std::env;
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand};
 
-const HELP_MSG: &str = r#"
-usage: profcollectctl [command]
+#[derive(Parser)]
+#[command(about = "Command interface for profcollectd", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
 
-Command to control profcollectd behaviour.
-
-command:
-    trace       Request an one-off system-wide trace.
-    process     Convert traces to perf profiles.
-    report      Create a report containing all profiles.
-    reset       Clear all local data.
-    help        Print this message.
-"#;
+#[derive(Subcommand)]
+enum Commands {
+    /// Request an one-off system-wide trace.
+    Trace,
+    /// Convert traces to perf profiles.
+    Process,
+    /// Create a report containing all profiles.
+    Report,
+    /// Clear all local data and reset the state.
+    Reset,
+}
 
 fn main() -> Result<()> {
     libprofcollectd::init_logging();
 
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        bail!("This program only takes one argument{}", &HELP_MSG);
-    }
-
-    let action = &args[1];
-    match action.as_str() {
-        "trace" => {
+    let cli = Cli::parse();
+    match &cli.command {
+        Commands::Trace => {
             println!("Performing system-wide trace");
             libprofcollectd::trace_system("manual").context("Failed to trace.")?;
         }
-        "process" => {
+        Commands::Process => {
             println!("Processing traces");
             libprofcollectd::process().context("Failed to process traces.")?;
         }
-        "report" => {
+        Commands::Report => {
             println!("Creating profile report");
             let path = libprofcollectd::report().context("Failed to create profile report.")?;
             println!("Report created at: {}", &path);
         }
-        "reset" => {
+        Commands::Reset => {
             libprofcollectd::reset().context("Failed to reset.")?;
             println!("Reset done.");
         }
-        "help" => println!("{}", &HELP_MSG),
-        arg => bail!("Unknown argument: {}\n{}", &arg, &HELP_MSG),
     }
     Ok(())
 }

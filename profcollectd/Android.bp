@@ -50,6 +50,7 @@ rust_binary {
 
     rustlibs: [
         "libanyhow",
+        "libclap",
         "libprofcollectd",
     ],
 }
