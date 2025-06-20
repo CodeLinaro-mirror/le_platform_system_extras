@@ -130,6 +130,10 @@ class KernelRecordReader {
   uint64_t record_time_ = 0;
 };
 
+static inline bool CompareRecordTime(KernelRecordReader* r1, KernelRecordReader* r2) {
+  return r1->RecordTime() > r2->RecordTime();
+}
+
 // ETR-based ETM events aggregate data from all CPUs into a single buffer, while TRBE-based ETM
 // events send data to per-CPU buffers. So they have significant differences in data generate rates.
 // To provide a consistent user experience (not flooding data when switching from ETR to TRBE), we

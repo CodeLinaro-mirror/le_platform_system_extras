@@ -49,6 +49,11 @@ namespace simpleperf {
 
 using android::base::Split;
 
+// The max allowed pages in mapped buffer is decided by rlimit(RLIMIT_MEMLOCK).
+// Here 1024 is a desired value for pages in mapped buffer. If mapped
+// successfully, the buffer size = 1024 * 4K (page size) = 4M.
+static constexpr size_t DESIRED_PAGES_IN_MAPPED_BUFFER = 1024;
+
 static std::vector<std::string> default_measured_event_types{
     "cpu-cycles",   "stalled-cycles-frontend", "stalled-cycles-backend",
     "instructions", "branch-instructions",     "branch-misses",
@@ -378,37 +383,41 @@ class NewThreadMonitor {
 
  private:
   bool Scan() {
-    std::unordered_set<pid_t> new_tids;
+    std::map<pid_t, pid_t> new_threads;
     if (monitor_all_processes_) {
       for (int pid : GetAllProcesses()) {
         for (auto tid : GetThreadsInProcess(pid)) {
           if (threads_.count(tid) == 0) {
-            new_tids.insert(tid);
+            new_threads[tid] = pid;
           }
         }
       }
     } else {
-      for (auto tid : monitored_processes_) {
-        for (auto tid : GetThreadsInProcess(tid)) {
+      for (auto pid : monitored_processes_) {
+        for (auto tid : GetThreadsInProcess(pid)) {
           if (threads_.count(tid) == 0) {
-            new_tids.insert(tid);
+            new_threads[tid] = pid;
           }
         }
       }
     }
-    std::set<pid_t> open_event_file_tids;
-    for (auto tid : new_tids) {
-      ThreadInfo info;
-      if (ReadThreadNameAndPid(tid, &info.name, &info.pid)) {
-        info.tid = tid;
-        threads_[tid] = std::move(info);
-        open_event_file_tids.insert(tid);
+    if (!new_threads.empty()) {
+      std::set<pid_t> new_tids;
+      for (auto& p : new_threads) {
+        new_tids.insert(p.first);
       }
-    }
-    if (!open_event_file_tids.empty()) {
       // It's okay for OpenEventFilesForThreads() to return false. It happens
       // when the new threads exit before we can open event files for them.
-      event_selection_set_.OpenEventFilesForThreads(open_event_file_tids);
+      event_selection_set_.OpenEventFilesForThreads(new_tids);
+      event_selection_set_.MmapEventFilesForThreadNames(new_tids, DESIRED_PAGES_IN_MAPPED_BUFFER);
+      for (auto tid : new_tids) {
+        auto& info = threads_[tid];
+        info.tid = tid;
+        info.pid = new_threads[tid];
+        if (!GetThreadName(tid, &info.name)) {
+          info.name = "unknown";
+        }
+      }
     }
     return true;
   }
@@ -540,8 +549,10 @@ class StatCommand : public Command {
   void PrintHardwareCounters();
   bool AddDefaultMeasuredEventTypes();
   void SetEventSelectionFlags();
-  void MonitorEachThread(std::unique_ptr<Workload>& workload);
+  void MonitorEachThread();
+  void ReadThreadNames(std::unique_ptr<Workload>& workload);
   void AdjustToIntervalOnlyValues(std::vector<CountersInfo>& counters);
+  bool ReadThreadNameRecords();
   bool ShowCounters(const std::vector<CountersInfo>& counters, double duration_in_sec, FILE* fp);
   void CheckHardwareCounterMultiplexing();
   void PrintWarningForInaccurateEvents();
@@ -637,6 +648,12 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
   } else {
     need_to_check_targets = true;
   }
+  if (report_per_thread_) {
+    // When reporting per thread, we record thread name records to report accurate thread names.
+    // Because when we monitor an app launch or use --monitor-new-thread, a thread may change name
+    // after we read /proc/<tid>/comm.
+    event_selection_set_.SetOnlyRecordingThreadNames();
+  }
   std::unique_ptr<NewThreadMonitor> new_thread_monitor;
   if (monitor_new_thread_) {
     new_thread_monitor.reset(new NewThreadMonitor(event_selection_set_, system_wide_collection_,
@@ -644,12 +661,19 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
                                                   thread_info_));
   }
   if (report_per_thread_) {
-    MonitorEachThread(workload);
+    MonitorEachThread();
   }
 
   // 3. Open perf_event_files and output file if defined.
   if (!event_selection_set_.OpenEventFiles()) {
     return false;
+  }
+  if (report_per_thread_) {
+    if (!event_selection_set_.MmapEventFilesForThreadNames(
+            event_selection_set_.GetMonitoredThreads(), DESIRED_PAGES_IN_MAPPED_BUFFER)) {
+      return false;
+    }
+    ReadThreadNames(workload);
   }
   std::unique_ptr<FILE, decltype(&fclose)> fp_holder(nullptr, fclose);
   if (!output_filename_.empty()) {
@@ -697,6 +721,9 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
         std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time).count();
     if (interval_only_values_) {
       AdjustToIntervalOnlyValues(counters);
+    }
+    if (report_per_thread_ && !ReadThreadNameRecords()) {
+      return false;
     }
     if (!ShowCounters(counters, duration_in_sec, fp)) {
       return false;
@@ -1000,32 +1027,38 @@ void StatCommand::SetEventSelectionFlags() {
   event_selection_set_.SetInherit(child_inherit_);
 }
 
-void StatCommand::MonitorEachThread(std::unique_ptr<Workload>& workload) {
+void StatCommand::MonitorEachThread() {
   std::vector<pid_t> threads;
   for (auto pid : event_selection_set_.GetMonitoredProcesses()) {
     for (auto tid : GetThreadsInProcess(pid)) {
-      ThreadInfo info;
-      if (GetThreadName(tid, &info.name)) {
-        if (tid == pid && workload && workload->GetPid() == pid) {
-          info.name = workload->GetCommandName();
-        }
-        info.tid = tid;
-        info.pid = pid;
-        thread_info_[tid] = std::move(info);
-        threads.push_back(tid);
-      }
+      ThreadInfo& info = thread_info_[tid];
+      info.tid = tid;
+      info.pid = pid;
+      info.name = "unknown";
+      threads.push_back(tid);
     }
   }
   for (auto tid : event_selection_set_.GetMonitoredThreads()) {
-    ThreadInfo info;
+    ThreadInfo& info = thread_info_[tid];
     if (ReadThreadNameAndPid(tid, &info.name, &info.pid)) {
-      info.tid = tid;
-      thread_info_[tid] = std::move(info);
       threads.push_back(tid);
     }
   }
   event_selection_set_.ClearMonitoredTargets();
   event_selection_set_.AddMonitoredThreads(threads);
+}
+
+void StatCommand::ReadThreadNames(std::unique_ptr<Workload>& workload) {
+  for (auto& p : thread_info_) {
+    ThreadInfo& info = p.second;
+    GetThreadName(info.tid, &info.name);
+  }
+  if (workload) {
+    auto it = thread_info_.find(workload->GetPid());
+    if (it != thread_info_.end()) {
+      it->second.name = workload->GetCommandName();
+    }
+  }
 }
 
 void StatCommand::AdjustToIntervalOnlyValues(std::vector<CountersInfo>& counters) {
@@ -1048,6 +1081,24 @@ void StatCommand::AdjustToIntervalOnlyValues(std::vector<CountersInfo>& counters
       last_sum[j] = new_sum;
     }
   }
+}
+
+bool StatCommand::ReadThreadNameRecords() {
+  auto callback = [&](Record* r) {
+    if (r->type() == PERF_RECORD_COMM) {
+      CommRecord* cr = static_cast<CommRecord*>(r);
+      uint32_t tid = cr->data->tid;
+      if (auto it = thread_info_.find(tid); it != thread_info_.end()) {
+        if (tid == it->second.pid && android::base::StartsWith(it->second.name, cr->comm)) {
+          // When it is a process, we may already got a longer name from /proc/<pid>/cmdline.
+          return true;
+        }
+        it->second.name = cr->comm;
+      }
+    };
+    return true;
+  };
+  return event_selection_set_.ReadThreadNameRecords(callback);
 }
 
 // Normalize a single entry intended for use in a CSV file.
