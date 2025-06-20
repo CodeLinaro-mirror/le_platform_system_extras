@@ -17,7 +17,7 @@
 //! Command to control profcollectd behaviour.
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(about = "Command interface for profcollectd", long_about = None)]
@@ -29,7 +29,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Request an one-off system-wide trace.
-    Trace,
+    Trace(TraceArgs),
     /// Convert traces to perf profiles.
     Process,
     /// Create a report containing all profiles.
@@ -38,14 +38,22 @@ enum Commands {
     Reset,
 }
 
+#[derive(Args)]
+struct TraceArgs {
+    #[arg(short = 't', long = "tag", default_value_t = String::from("manual"))]
+    tag: String,
+    #[arg(short = 'd', long = "duration", default_value_t = 1000)]
+    duration_ms: i32,
+}
+
 fn main() -> Result<()> {
     libprofcollectd::init_logging();
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Trace => {
+        Commands::Trace(TraceArgs { tag, duration_ms }) => {
             println!("Performing system-wide trace");
-            libprofcollectd::trace_system("manual").context("Failed to trace.")?;
+            libprofcollectd::trace_system(tag, *duration_ms).context("Failed to trace.")?;
         }
         Commands::Process => {
             println!("Processing traces");

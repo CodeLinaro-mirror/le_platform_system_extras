@@ -44,13 +44,17 @@ impl Scheduler {
         })
     }
 
-    pub fn trace_system(&self, config: &Config, tag: &str) -> Result<()> {
+    pub fn trace_system(&self, config: &Config, tag: &str, sampling_period: i32) -> Result<()> {
         let trace_provider = self.trace_provider.clone();
+        let duration = match sampling_period {
+            0 => get_sampling_period(),
+            _ => Duration::from_millis(sampling_period as u64),
+        };
         if check_space_limit(&TRACE_OUTPUT_DIR, config)? {
             trace_provider.lock().unwrap().trace_system(
                 &TRACE_OUTPUT_DIR,
                 tag,
-                &get_sampling_period(),
+                &duration,
                 &config.binary_filter,
             );
         }
@@ -62,11 +66,11 @@ impl Scheduler {
         config: &Config,
         tag: &str,
         processes: &str,
-        samplng_period: f32,
+        samplng_period: i32,
     ) -> Result<()> {
         let trace_provider = self.trace_provider.clone();
         let duration = match samplng_period {
-            0.0 => get_sampling_period(),
+            0 => get_sampling_period(),
             _ => Duration::from_millis(samplng_period as u64),
         };
         if check_space_limit(&TRACE_OUTPUT_DIR, config)? {
