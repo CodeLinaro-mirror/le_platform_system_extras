@@ -53,6 +53,8 @@ TIMING_THRESHOLD = 5.0
 BOOT_PROP = r"\[ro\.boottime\.([^\]]+)\]:\s+\[(\d+)\]"
 BOOTLOADER_TIME_PROP = r"\[ro\.boot\.boottime\]:\s+\[([^\]]+)\]"
 CARWATCHDOG_PARSER_CMD = 'perf_stats_parser'
+LOGIN_START = "LoginStart"
+LOGIN_END = "LoginEnd"
 
 max_wait_time = BOOT_TIME_TOO_BIG
 
@@ -96,6 +98,9 @@ def main():
 
   if args.iterate > 1 and args.bootchart:
     run_adb_shell_cmd_as_root('touch /data/bootchart/enabled')
+
+  if args.login and not args.skip_login_setup:
+    prepare_login_credentials()
 
   search_events_pattern = {key: re.compile(pattern)
                    for key, pattern in cfg['events'].items()}
@@ -353,6 +358,8 @@ def iterate(args, search_events_pattern, timings_pattern, shutdown_events_patter
     logcat_stop_events.append("FsStat")
   if args.carwatchdog:
     logcat_stop_events.append(CARWATCHDOG_BOOT_COMPLETE)
+  if args.login:
+    logcat_stop_events.append(LOGIN_END)
   logcat_events, logcat_timing_events = collect_events(
     search_events_pattern, ADB_CMD + ' logcat -b all -v epoch', timings_pattern,\
     logcat_stop_events, True, False)
@@ -519,6 +526,49 @@ def iterate(args, search_events_pattern, timings_pattern, shutdown_events_patter
   return data_points, kernel_timing_points, logcat_timing_points, boottime_events, shutdown_events,\
       shutdown_timing_events
 
+def prepare_login_credentials():
+  # Try to remove OOBE if it exists. In case this command fails, OOBE is not
+  # running and we can proceed anyway.
+  run_adb_shell_cmd_as_root('am start -a com.android.setupwizard.FOUR_CORNER_EXIT')
+  result, err = run_adb_shell_cmd(
+      'cmd lock_settings set-password --user 10 1234')
+  if err != 0:
+    # Try to remove the password if it was left over by a previous workflow
+    result, err = run_adb_shell_cmd(
+        'cmd lock_settings clear --user 10 --old 1234')
+    if err != 0:
+      raise Exception(
+          'Failed to clear old credentials: ' + result)
+    # Try again to set the password
+    result, err = run_adb_shell_cmd(
+        'cmd lock_settings set-password --user 10 1234')
+    if err != 0:
+      raise Exception('Failed to set password on user 10: ' + result)
+
+def do_login():
+  # We sleep for some time to allow slower devices to display the proper user
+  # selection screen. This is because the launcher start event does not always
+  # match the immediate display of a usable and interactive screen.
+  time.sleep(5)
+  # Get center coordinates of screen
+  result, err = run_adb_shell_cmd('wm size')
+  if err != 0:
+    raise Exception(
+        'Unable to get device screen size: ' + result)
+  match = re.search(r'Physical size:\s*(\d+)x(\d+)', result)
+  if not match:
+    raise Exception(
+        'Could not parse screen coordinates from display size: ' + result)
+  x = int(match.group(1)) / 2
+  y = int(match.group(2)) / 2
+  run_adb_shell_cmd(f'input tap {x} {y}')
+  # Sleep some more time to allow the user selection screen to transition into a
+  # lock screen as the process takes some time on slower devices.
+  time.sleep(5)
+  # Type password and confirm with enter key
+  run_adb_shell_cmd('input text 1234')
+  run_adb_shell_cmd('input keyevent 66')
+
 def debug(string):
   if DEBUG:
     print(string)
@@ -582,6 +632,10 @@ def init_arguments():
   parser.add_argument('-G', '--buffersize', dest='buffersize', action='store', type=str,
                       default=None,
                       help='set logcat buffersize')
+  parser.add_argument('-l', '--login', dest='login', action='store_true',
+                      help='perform the login/unlock workflow and also collect login stats')
+  parser.add_argument('--skip-login-setup', dest='skip_login_setup', action='store_true',
+                      help='if login workflow is enabled, skip the OOBE and credential setup')
   return parser.parse_args()
 
 def handle_zygote_event(zygote_pids, events, event, line):
@@ -698,6 +752,7 @@ def collect_events(search_events, command, timings, stop_events,
   zygote_pids = []
   start_time = time.time()
   zygote_found = False
+  login_started = False
   line = None
   if collects_all_events:
     print("remaining stop_events:", stop_events)
@@ -760,6 +815,10 @@ def collect_events(search_events, command, timings, stop_events,
         else:
           new_event = update_name_if_already_exist(events, event)
           events[new_event] = line
+        # Initial boot is done, perform login operation
+        if LOGIN_END in stop_events and event == LAUNCHER_START and not login_started:
+          login_started = True
+          do_login()
         if event in stop_events:
           if collects_all_events:
             stop_events.remove(event)
