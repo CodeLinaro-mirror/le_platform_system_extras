@@ -1097,6 +1097,7 @@
       ["0x069C", "IDQ_UOPS_NOT_DELIVERED.CYCLES_0_UOPS_DELIV.CORE", "Counts the number of cycles when no uops were delivered by the Instruction Decode Queue (IDQ) to the back-end of the pipeline when there was no back-end stalls. This event counts for one SMT thread in a given cycle.","atom=0x0000"],
       ["0x069C", "IDQ_UOPS_NOT_DELIVERED.CYCLES_0_UOPS_DELIV.CORE", "Counts the number of cycles when no uops were delivered by the Instruction Decode Queue (IDQ) to the back-end of the pipeline when there was no back-end stalls. This event counts for one SMT thread in a given cycle.","atom=0x0000"],
       ["0x069C", "IDQ_UOPS_NOT_DELIVERED.CYCLES_FE_WAS_OK", "Counts the number of cycles when the optimal number of uops were delivered by the Instruction Decode Queue (IDQ) to the back-end of the pipeline when there was no back-end stalls. This event counts for one SMT thread in a given cycle.","atom=0x0000"],
+      ["0x01AE", "UOPS_ISSUED.ANY", "Counts the number of uops that the Resource Allocation Table (RAT) issues to the Reservation Station (RS).","atom=0x000E"],
       ["0x0100", "INST_RETIRED.ANY", "Number of instructions retired. Fixed Counter - architectural event","atom=0x0100"],
       ["0x0200", "CPU_CLK_UNHALTED.THREAD", "Counts the number of unhalted core clock cycles. (Fixed event)","atom=0x0200"]
     ]
