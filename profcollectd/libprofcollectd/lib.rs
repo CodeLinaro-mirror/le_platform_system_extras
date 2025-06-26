@@ -23,19 +23,18 @@ mod service;
 mod trace_provider;
 
 use anyhow::{Context, Result};
+use nix::sys::sysinfo;
 use profcollectd_aidl_interface::aidl::com::android::server::profcollect::IProfCollectd::{
     self, BnProfCollectd,
 };
 use profcollectd_aidl_interface::aidl::com::android::server::profcollect::IProviderStatusCallback::{IProviderStatusCallback, BnProviderStatusCallback};
 use profcollectd_aidl_interface::binder::{self, BinderFeatures};
 use service::{err_to_binder_status, ProfcollectdBinderService};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 const PROFCOLLECTD_SERVICE_NAME: &str = "profcollectd";
 
-struct ProviderStatusCallback {
-    service_start_time: Instant,
-}
+struct ProviderStatusCallback;
 
 impl binder::Interface for ProviderStatusCallback {}
 
@@ -43,9 +42,11 @@ impl IProviderStatusCallback for ProviderStatusCallback {
     fn onProviderReady(&self) -> binder::Result<()> {
         // If we have waited too long for the provider to be ready, then we have passed
         // boot phase, and no need to collect boot profile.
-        // TODO: should we check boottime instead?
         const TIMEOUT_TO_COLLECT_BOOT_PROFILE: Duration = Duration::from_secs(3);
-        let elapsed = Instant::now().duration_since(self.service_start_time);
+        let elapsed = sysinfo::sysinfo()
+            .context("Failed to get sysinfo")
+            .map_err(err_to_binder_status)?
+            .uptime();
         if elapsed < TIMEOUT_TO_COLLECT_BOOT_PROFILE {
             trace_system("boot", 0).map_err(err_to_binder_status)?;
         }
@@ -65,10 +66,8 @@ pub fn init_service() -> Result<()> {
     )
     .context("Failed to register service.")?;
 
-    let cb = BnProviderStatusCallback::new_binder(
-        ProviderStatusCallback { service_start_time: Instant::now() },
-        BinderFeatures::default(),
-    );
+    let cb =
+        BnProviderStatusCallback::new_binder(ProviderStatusCallback, BinderFeatures::default());
     get_profcollectd_service()?.registerProviderStatusCallback(&cb)?;
 
     binder::ProcessState::join_thread_pool();
