@@ -29,6 +29,7 @@ Flags:
 -b : If set grabs bootchart
 -w : If set grabs carwatchdog perf stats
 -s : Set the device serial for adb
+-l : Perform login flow and capture login stats too
 '
     exit
 }
@@ -59,8 +60,9 @@ BOOTCHART_FLAG=""
 CARWATCHDOG_FLAG=""
 PY_SERIAL_FLAG=""
 ADB_SERIAL_FLAG=""
+LOGIN_FLAG=""
 
-while getopts 'abws:' OPTION; do
+while getopts 'abws:l' OPTION; do
   case "$OPTION" in
     a)
       REBOOT_FLAG="-a"
@@ -74,6 +76,9 @@ while getopts 'abws:' OPTION; do
     s)
       PY_SERIAL_FLAG="--serial ${OPTARG}"
       ADB_SERIAL_FLAG="-s ${OPTARG}"
+      ;;
+    l)
+      LOGIN_FLAG="--login"
       ;;
     ?)
       echo 'Error: Invalid flag set'
@@ -100,7 +105,7 @@ for (( l=$START; l<=$LOOPS; l++ )); do
     mkdir $RESULTS_DIR/$l
     $SCRIPT_DIR/bootanalyze.py -c $CONFIG_YMAL -G 4M -r \
         $PY_SERIAL_FLAG $REBOOT_FLAG $BOOTCHART_FLAG $CARWATCHDOG_FLAG \
-        -o "$RESULTS_DIR/$l" 1> "$RESULTS_DIR/$l/boot.txt"
+        $LOGIN_FLAG -o "$RESULTS_DIR/$l" 1> "$RESULTS_DIR/$l/boot.txt"
     if [[ $? -ne 0 ]]; then
         echo "bootanalyze.py failed"
         exit 1
