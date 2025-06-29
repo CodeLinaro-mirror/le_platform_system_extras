@@ -61,12 +61,6 @@ bool IsETMDeviceAvailable() {
     LOG(INFO) << "HasDeviceSupport check failed: " << result.error();
     return false;
   }
-  if (auto version = GetKernelVersion(); version && version.value() >= std::make_pair(6, 6)) {
-    if (ETMRecorder::GetInstance().GetCPUsHavingTRBESink().empty()) {
-      LOG(INFO) << "HasDeviceSupport check failed: requiring TRBE on >= 6.6 kernel";
-      return false;
-    }
-  }
   const EventType* type = FindEventTypeByName("cs-etm", false);
   if (type == nullptr) {
     LOG(INFO) << "HasDeviceSupport check failed: no etm event";
