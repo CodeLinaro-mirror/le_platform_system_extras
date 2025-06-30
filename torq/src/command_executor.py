@@ -147,12 +147,22 @@ class ProfilerCommandExecutor(CommandExecutor):
       print("Trace interrupted.")
       self.stop_process(device, command.profiler)
       return error
-    while process.poll() is None and not self.trace_cancelled:
-      continue
-    if process.poll() is None:
-      print("Trace interrupted.")
+    self.wait_for_trace(command, device, process)
+    if device.is_package_running(command.profiler):
+      print("\nTrace interrupted.")
       self.stop_process(device, command.profiler)
     return None
+
+  def wait_for_trace(self, command, device, process):
+    cur_dots = 1
+    total_dots = 3
+    while not self.is_trace_cancelled(command.profiler, device, process):
+      if cur_dots > total_dots:
+        cur_dots = 1
+      print('\rTracing' + '.' * cur_dots + ' ' * (total_dots - cur_dots), end='', flush=True)
+      cur_dots += 1
+      time.sleep(0.5)
+    print()
 
   def trigger_system_event(self, command, device):
     return None
@@ -185,6 +195,9 @@ class ProfilerCommandExecutor(CommandExecutor):
         raise Exception("Simpleperf post-processing took too long.")
     else:
       device.kill_process(name)
+
+  def is_trace_cancelled(self, profiler, device, process):
+    return process.poll() is not None or self.trace_cancelled
 
 
 class UserSwitchCommandExecutor(ProfilerCommandExecutor):
@@ -238,9 +251,7 @@ class BootCommandExecutor(ProfilerCommandExecutor):
     else:
       print("Tracing. Press CTRL+C to end.")
     device.wait_for_boot_to_complete()
-    while (device.is_package_running(command.profiler)
-           and not self.trace_cancelled):
-      continue
+    self.wait_for_trace(command, device, None)
     if device.is_package_running(command.profiler):
       print("Trace interrupted.")
       self.stop_process(device, command.profiler)
@@ -252,6 +263,9 @@ class BootCommandExecutor(ProfilerCommandExecutor):
   def retrieve_perf_data(self, command, device, host_raw_trace_filename,
       host_gecko_trace_filename):
     device.pull_file(PERFETTO_BOOT_TRACE_FILE, host_raw_trace_filename)
+
+  def is_trace_cancelled(self, profiler, device, process):
+    return not device.is_package_running(profiler) or self.trace_cancelled
 
 
 class AppStartupCommandExecutor(ProfilerCommandExecutor):
