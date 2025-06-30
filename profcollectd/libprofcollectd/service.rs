@@ -51,17 +51,17 @@ struct Lock {
 impl binder::Interface for ProfcollectdBinderService {}
 
 impl IProfCollectd for ProfcollectdBinderService {
-    fn trace_system(&self, tag: &str) -> BinderResult<()> {
+    fn trace_system(&self, tag: &str, duration_ms: i32) -> BinderResult<()> {
         let lock = &mut *self.lock();
         lock.scheduler
-            .trace_system(&lock.config, tag)
+            .trace_system(&lock.config, tag, duration_ms)
             .context("Failed to perform system-wide trace.")
             .map_err(err_to_binder_status)
     }
-    fn trace_process(&self, tag: &str, process: &str, duration: f32) -> BinderResult<()> {
+    fn trace_process(&self, tag: &str, process: &str, duration_ms: i32) -> BinderResult<()> {
         let lock = &mut *self.lock();
         lock.scheduler
-            .trace_process(&lock.config, tag, process, duration)
+            .trace_process(&lock.config, tag, process, duration_ms)
             .context("Failed to perform process trace.")
             .map_err(err_to_binder_status)
     }
