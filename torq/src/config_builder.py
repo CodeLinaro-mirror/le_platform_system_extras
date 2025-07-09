@@ -53,93 +53,48 @@ def create_ftrace_events_string(predefined_ftrace_events,
   return ftrace_events_string, None
 
 
-def build_default_config(command, android_sdk_version):
-  predefined_ftrace_events = [
-      "dmabuf_heap/dma_heap_stat",
-      "ftrace/print",
-      "gpu_mem/gpu_mem_total",
-      "ion/ion_stat",
-      "kmem/ion_heap_grow",
-      "kmem/ion_heap_shrink",
-      "kmem/rss_stat",
-      "lowmemorykiller/lowmemory_kill",
-      "mm_event/mm_event_record",
-      "oom/mark_victim",
-      "oom/oom_score_adj_update",
-      "power/cpu_frequency",
-      "power/cpu_idle",
-      "power/gpu_frequency",
-      "power/suspend_resume",
-      "power/wakeup_source_activate",
-      "power/wakeup_source_deactivate",
-      "sched/sched_blocked_reason",
-      "sched/sched_process_exit",
-      "sched/sched_process_free",
-      "sched/sched_switch",
-      "sched/sched_wakeup",
-      "sched/sched_wakeup_new",
-      "sched/sched_waking",
-      "task/task_newtask",
-      "task/task_rename",
-      "vmscan/*",
-      "workqueue/*",
-  ]
-  ftrace_events_string, error = create_ftrace_events_string(
-      predefined_ftrace_events, command.excluded_ftrace_events,
-      command.included_ftrace_events)
-  if error is not None:
-    return None, error
-  cpufreq_period_string = "cpufreq_period_ms: 500"
-  if android_sdk_version < ANDROID_SDK_VERSION_T:
-    cpufreq_period_string = ""
-  duration_string = ""
-  if command.dur_ms is not None:
-    duration_string = "duration_ms: %d" % command.dur_ms
-  config = f'''\
-    <<EOF
+def build_predefined_config(command, android_sdk_version,
+    predefined_ftrace_events = None, sys_stats_events = None, predefined_atrace_events = None,
+    log_priority = "PRIO_VERBOSE", buffers = None, linux_process_stats = None,
+    android_logs = None, android_packages = None, sys_stats = None,
+    surface_flinger = None, ftrace = None, metatrace = None,
+    miscellaneous_options = None, incremental_state = None,
+    extra_configs = ""):
+  if predefined_ftrace_events is None:
+    predefined_ftrace_events = [
+        "dmabuf_heap/dma_heap_stat",
+        "ftrace/print",
+        "gpu_mem/gpu_mem_total",
+        "ion/ion_stat",
+        "kmem/ion_heap_grow",
+        "kmem/ion_heap_shrink",
+        "kmem/rss_stat",
+        "lowmemorykiller/lowmemory_kill",
+        "mm_event/mm_event_record",
+        "oom/mark_victim",
+        "oom/oom_score_adj_update",
+        "power/cpu_frequency",
+        "power/cpu_idle",
+        "power/gpu_frequency",
+        "power/suspend_resume",
+        "power/wakeup_source_activate",
+        "power/wakeup_source_deactivate",
+        "sched/sched_blocked_reason",
+        "sched/sched_process_exit",
+        "sched/sched_process_free",
+        "sched/sched_switch",
+        "sched/sched_wakeup",
+        "sched/sched_wakeup_new",
+        "sched/sched_waking",
+        "task/task_newtask",
+        "task/task_rename",
+        "vmscan/*",
+        "workqueue/*",
+    ]
 
-    buffers: {{
-      size_kb: 4096
-      fill_policy: RING_BUFFER
-    }}
-    buffers {{
-      size_kb: 4096
-      fill_policy: RING_BUFFER
-    }}
-    buffers: {{
-      size_kb: 260096
-      fill_policy: RING_BUFFER
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.process_stats"
-        process_stats_config {{
-          scan_all_processes_on_start: true
-        }}
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "android.log"
-        android_log_config {{
-        }}
-      }}
-    }}
-
-    data_sources {{
-      config {{
-        name: "android.packages_list"
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.sys_stats"
-        target_buffer: 1
-        sys_stats_config {{
-          stat_period_ms: 500
+  if sys_stats_events is None:
+    sys_stats_events = \
+    f'''stat_period_ms: 500
           stat_counters: STAT_CPU_TIMES
           stat_counters: STAT_FORK_COUNT
           meminfo_period_ms: 1000
@@ -167,26 +122,11 @@ def build_default_config(command, android_sdk_version):
           vmstat_counters: VMSTAT_PGSTEAL_DIRECT
           vmstat_counters: VMSTAT_PGSCAN_KSWAPD
           vmstat_counters: VMSTAT_PGSTEAL_KSWAPD
-          vmstat_counters: VMSTAT_WORKINGSET_REFAULT
-          {cpufreq_period_string}
-        }}
-      }}
-    }}
+          vmstat_counters: VMSTAT_WORKINGSET_REFAULT'''
 
-    data_sources: {{
-      config {{
-        name: "android.surfaceflinger.frametimeline"
-        target_buffer: 2
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.ftrace"
-        target_buffer: 2
-        ftrace_config {{
-          {ftrace_events_string}
-          atrace_categories: "aidl"
+  if predefined_atrace_events is None:
+    predefined_atrace_events = \
+    f'''atrace_categories: "aidl"
           atrace_categories: "am"
           atrace_categories: "dalvik"
           atrace_categories: "binder_lock"
@@ -210,58 +150,25 @@ def build_default_config(command, android_sdk_version):
           atrace_categories: "video"
           atrace_categories: "view"
           atrace_categories: "wm"
-          atrace_apps: "*"
-          buffer_size_kb: 16384
-          drain_period_ms: 150
-          symbolize_ksyms: true
-        }}
-      }}
-    }}
+          atrace_apps: "*"'''
 
-    data_sources {{
-      config {{
-        name: "perfetto.metatrace"
-        target_buffer: 2
-      }}
-      producer_name_filter: "perfetto.traced_probes"
-    }}
-
-    {duration_string}
-    write_into_file: true
-    file_write_period_ms: 5000
-    max_file_size_bytes: 100000000000
-    flush_period_ms: 5000
-    incremental_state_config {{
-      clear_period_ms: 5000
-    }}
-
-    EOF'''
-  return textwrap.dedent(config), None
-
-
-def build_lightweight_config(command, android_sdk_version):
-  predefined_ftrace_events = [
-      "power/cpu_idle",
-      "sched/sched_blocked_reason",
-      "sched/sched_switch",
-      "sched/sched_wakeup",
-      "sched/sched_wakeup_new",
-      "sched/sched_waking",
-  ]
   ftrace_events_string, error = create_ftrace_events_string(
       predefined_ftrace_events, command.excluded_ftrace_events,
       command.included_ftrace_events)
   if error is not None:
     return None, error
+
   cpufreq_period_string = "cpufreq_period_ms: 500"
   if android_sdk_version < ANDROID_SDK_VERSION_T:
     cpufreq_period_string = ""
+
   duration_string = ""
   if command.dur_ms is not None:
-    duration_string = "duration_ms: %d" % command.dur_ms
-  config = f'''\
-    <<EOF
+    duration_string = f'''
+    duration_ms: {command.dur_ms}'''
 
+  if buffers is None:
+    buffers = f'''
     buffers: {{
       size_kb: 4096
       fill_policy: RING_BUFFER
@@ -273,8 +180,10 @@ def build_lightweight_config(command, android_sdk_version):
     buffers: {{
       size_kb: 260096
       fill_policy: RING_BUFFER
-    }}
+    }}'''
 
+  if linux_process_stats is None:
+    linux_process_stats = f'''
     data_sources: {{
       config {{
         name: "linux.process_stats"
@@ -282,44 +191,124 @@ def build_lightweight_config(command, android_sdk_version):
           scan_all_processes_on_start: true
         }}
       }}
-    }}
+    }}'''
 
+  if android_logs is None:
+    android_logs = f'''
     data_sources: {{
       config {{
         name: "android.log"
         android_log_config {{
-          min_prio: PRIO_ERROR
+          min_prio: {log_priority}
         }}
       }}
-    }}
+    }}'''
 
+  if android_packages is None:
+    android_packages = f'''
     data_sources {{
       config {{
         name: "android.packages_list"
       }}
-    }}
+    }}'''
 
+  if sys_stats is None:
+    sys_stats = f'''
     data_sources: {{
       config {{
         name: "linux.sys_stats"
         target_buffer: 1
         sys_stats_config {{
-          stat_period_ms: 500
-          stat_counters: STAT_CPU_TIMES
-          meminfo_period_ms: 1000
-          meminfo_counters: MEMINFO_MEM_FREE
+          {sys_stats_events}
           {cpufreq_period_string}
         }}
       }}
-    }}
+    }}'''
 
+  if surface_flinger is None:
+    surface_flinger = f'''
+    data_sources: {{
+      config {{
+        name: "android.surfaceflinger.frametimeline"
+        target_buffer: 2
+      }}
+    }}'''
+
+  if ftrace is None:
+    ftrace = f'''
     data_sources: {{
       config {{
         name: "linux.ftrace"
         target_buffer: 2
         ftrace_config {{
           {ftrace_events_string}
-          atrace_categories: "aidl"
+          {predefined_atrace_events}
+          buffer_size_kb: 16384
+          drain_period_ms: 150
+          symbolize_ksyms: true
+        }}
+      }}
+    }}'''
+
+  if metatrace is None:
+    metatrace = f'''
+    data_sources {{
+      config {{
+        name: "perfetto.metatrace"
+        target_buffer: 2
+      }}
+      producer_name_filter: "perfetto.traced_probes"
+    }}'''
+
+  if miscellaneous_options is None:
+    miscellaneous_options = f'''
+    write_into_file: true
+    file_write_period_ms: 5000
+    max_file_size_bytes: 100000000000
+    flush_period_ms: 5000'''
+
+  if incremental_state is None:
+    incremental_state = f'''
+    incremental_state_config {{
+      clear_period_ms: 5000
+    }}'''
+
+  config = f'''\
+    <<EOF
+    {buffers}
+    {linux_process_stats.lstrip()}
+    {android_logs.lstrip()}
+    {android_packages.lstrip()}
+    {sys_stats.lstrip()}
+    {surface_flinger.lstrip()}
+    {ftrace.lstrip()}
+    {extra_configs.lstrip()}
+    {metatrace.lstrip()}
+    {duration_string.lstrip()}
+    {miscellaneous_options.lstrip()}
+    {incremental_state.lstrip()}
+
+    EOF'''
+  return textwrap.dedent(config), None
+
+def build_default_config(command, android_sdk_version):
+  return build_predefined_config(command, android_sdk_version)
+
+
+def build_lightweight_config(command, android_sdk_version):
+  predefined_ftrace_events = [
+      "power/cpu_idle",
+      "sched/sched_blocked_reason",
+      "sched/sched_switch",
+      "sched/sched_wakeup",
+      "sched/sched_wakeup_new",
+      "sched/sched_waking",
+  ]
+  sys_stats_config = f'''stat_period_ms: 500
+          stat_counters: STAT_CPU_TIMES
+          meminfo_period_ms: 1000
+          meminfo_counters: MEMINFO_MEM_FREE'''
+  atrace_events = f'''atrace_categories: "aidl"
           atrace_categories: "am"
           atrace_categories: "binder_lock"
           atrace_categories: "binder_driver"
@@ -345,33 +334,11 @@ def build_lightweight_config(command, android_sdk_version):
           atrace_apps: "com.android.systemui"
           atrace_apps: "com.google.android.gms"
           atrace_apps: "com.google.android.gms.persistent"
-          atrace_apps: "android:ui"
-          buffer_size_kb: 16384
-          drain_period_ms: 150
-          symbolize_ksyms: true
-        }}
-      }}
-    }}
-
-    data_sources {{
-      config {{
-        name: "perfetto.metatrace"
-        target_buffer: 2
-      }}
-      producer_name_filter: "perfetto.traced_probes"
-    }}
-
-    {duration_string}
-    write_into_file: true
-    file_write_period_ms: 5000
-    max_file_size_bytes: 100000000000
-    flush_period_ms: 5000
-    incremental_state_config {{
-      clear_period_ms: 5000
-    }}
-
-    EOF'''
-  return textwrap.dedent(config), None
+          atrace_apps: "android:ui"'''
+  return build_predefined_config(command, android_sdk_version,
+                                 predefined_ftrace_events, sys_stats_config,
+                                 atrace_events, "PRIO_ERROR",
+                                 surface_flinger="")
 
 
 def build_memory_config(command, android_sdk_version):
@@ -393,63 +360,7 @@ def build_memory_config(command, android_sdk_version):
       "sched/sched_wakeup_new",
       "sched/sched_waking",
   ]
-  ftrace_events_string, error = create_ftrace_events_string(
-      predefined_ftrace_events, command.excluded_ftrace_events,
-      command.included_ftrace_events)
-  if error is not None:
-    return None, error
-  cpufreq_period_string = "cpufreq_period_ms: 500"
-  if android_sdk_version < ANDROID_SDK_VERSION_T:
-    cpufreq_period_string = ""
-  duration_string = ""
-  if command.dur_ms is not None:
-    duration_string = "duration_ms: %d" % command.dur_ms
-  config = f'''\
-    <<EOF
-
-    buffers: {{
-      size_kb: 4096
-      fill_policy: RING_BUFFER
-    }}
-    buffers {{
-      size_kb: 4096
-      fill_policy: RING_BUFFER
-    }}
-    buffers: {{
-      size_kb: 260096
-      fill_policy: RING_BUFFER
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.process_stats"
-        process_stats_config {{
-          scan_all_processes_on_start: true
-        }}
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "android.log"
-        android_log_config {{
-          min_prio: PRIO_ERROR
-        }}
-      }}
-    }}
-
-    data_sources {{
-      config {{
-        name: "android.packages_list"
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.sys_stats"
-        target_buffer: 1
-        sys_stats_config {{
-          stat_period_ms: 500
+  sys_stats_config = f'''stat_period_ms: 500
           stat_counters: STAT_CPU_TIMES
           stat_counters: STAT_FORK_COUNT
           meminfo_period_ms: 1000
@@ -483,29 +394,8 @@ def build_memory_config(command, android_sdk_version):
           vmstat_counters: VMSTAT_PGSTEAL_DIRECT
           vmstat_counters: VMSTAT_PGSCAN_KSWAPD
           vmstat_counters: VMSTAT_PGSTEAL_KSWAPD
-          vmstat_counters: VMSTAT_WORKINGSET_REFAULT
-          {cpufreq_period_string}
-        }}
-      }}
-    }}
-
-    data_sources {{
-      config {{
-        name: "android.java_hprof"
-        target_buffer: 2
-        java_hprof_config {{
-          process_cmdline: "system_server"
-        }}
-      }}
-    }}
-
-    data_sources: {{
-      config {{
-        name: "linux.ftrace"
-        target_buffer: 2
-        ftrace_config {{
-          {ftrace_events_string}
-          atrace_categories: "aidl"
+          vmstat_counters: VMSTAT_WORKINGSET_REFAULT'''
+  atrace_events = f'''atrace_categories: "aidl"
           atrace_categories: "am"
           atrace_categories: "binder_lock"
           atrace_categories: "binder_driver"
@@ -525,33 +415,22 @@ def build_memory_config(command, android_sdk_version):
           atrace_categories: "ss"
           atrace_categories: "view"
           atrace_categories: "wm"
-          atrace_apps: "*"
-          buffer_size_kb: 16384
-          drain_period_ms: 150
-          symbolize_ksyms: true
-        }}
-      }}
-    }}
-
+          atrace_apps: "*"'''
+  extra_configs = f'''
     data_sources {{
       config {{
-        name: "perfetto.metatrace"
+        name: "android.java_hprof"
         target_buffer: 2
+        java_hprof_config {{
+          process_cmdline: "system_server"
+        }}
       }}
-      producer_name_filter: "perfetto.traced_probes"
-    }}
-
-    {duration_string}
-    write_into_file: true
-    file_write_period_ms: 5000
-    max_file_size_bytes: 100000000000
-    flush_period_ms: 5000
-    incremental_state_config {{
-      clear_period_ms: 5000
-    }}
-
-    EOF'''
-  return textwrap.dedent(config), None
+    }}'''
+  return build_predefined_config(command, android_sdk_version,
+                                 predefined_ftrace_events, sys_stats_config,
+                                 atrace_events, "PRIO_ERROR",
+                                 surface_flinger="",
+                                 extra_configs = extra_configs)
 
 
 PREDEFINED_PERFETTO_CONFIGS = {
