@@ -131,7 +131,6 @@ buffers: {{
   size_kb: 260096
   fill_policy: RING_BUFFER
 }}
-
 data_sources: {{
   config {{
     name: "linux.process_stats"
@@ -140,7 +139,6 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.log"
@@ -150,13 +148,11 @@ COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING = f'''\
     }}
   }}
 }}
-
 data_sources {{
   config {{
     name: "android.packages_list"
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.sys_stats"
@@ -169,14 +165,12 @@ COMMON_DEFAULT_CONFIG_FTRACE_BEGINNING = f'''\
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.surfaceflinger.frametimeline"
     target_buffer: 2
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.ftrace"
@@ -197,8 +191,7 @@ data_sources {{
     target_buffer: 2
   }}
   producer_name_filter: "perfetto.traced_probes"
-}}
-'''
+}}'''
 
 COMMON_CONFIG_ENDING_STRING = f'''\
 write_into_file: true
@@ -208,11 +201,11 @@ flush_period_ms: 5000
 incremental_state_config {{
   clear_period_ms: 5000
 }}
-
 '''
 
 DEFAULT_CONFIG_9000_DUR_MS = f'''\
 {COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_VERBOSE
 {COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
 {COMMON_DEFAULT_SYS_EVENTS}
 {CPUFREQ_STRING_NEW_ANDROID}
@@ -221,7 +214,8 @@ DEFAULT_CONFIG_9000_DUR_MS = f'''\
 {COMMON_DEFAULT_ATRACE_EVENTS}
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 duration_ms: {TEST_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 
 LIGHTWEIGHT_CONFIG_9000_DUR_MS = f'''\
@@ -277,7 +271,8 @@ data_sources: {{
       atrace_apps: "android:ui"
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 duration_ms: {TEST_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 
 MEMORY_CONFIG_9000_DUR_MS = f'''\
@@ -320,16 +315,6 @@ MEMORY_CONFIG_9000_DUR_MS = f'''\
       vmstat_counters: VMSTAT_PGSTEAL_KSWAPD
       vmstat_counters: VMSTAT_WORKINGSET_REFAULT
 {CPUFREQ_STRING_NEW_ANDROID}
-    }}
-  }}
-}}
-
-data_sources {{
-  config {{
-    name: "android.java_hprof"
-    target_buffer: 2
-    java_hprof_config {{
-      process_cmdline: "system_server"
     }}
   }}
 }}
@@ -382,7 +367,15 @@ data_sources: {{
     }}
   }}
 }}
-
+data_sources {{
+  config {{
+    name: "android.java_hprof"
+    target_buffer: 2
+    java_hprof_config {{
+      process_cmdline: "system_server"
+    }}
+  }}
+}}
 data_sources {{
   config {{
     name: "perfetto.metatrace"
@@ -390,12 +383,13 @@ data_sources {{
   }}
   producer_name_filter: "perfetto.traced_probes"
 }}
-
 duration_ms: {TEST_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 DEFAULT_CONFIG_EXCLUDED_FTRACE_EVENTS = f'''\
 {COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_VERBOSE
 {COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
 {COMMON_DEFAULT_SYS_EVENTS}
 {CPUFREQ_STRING_NEW_ANDROID}
@@ -429,10 +423,12 @@ DEFAULT_CONFIG_EXCLUDED_FTRACE_EVENTS = f'''\
 {COMMON_DEFAULT_ATRACE_EVENTS}
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 duration_ms: {DEFAULT_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 DEFAULT_CONFIG_INCLUDED_FTRACE_EVENTS = f'''\
 {COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_VERBOSE
 {COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
 {COMMON_DEFAULT_SYS_EVENTS}
 {CPUFREQ_STRING_NEW_ANDROID}
@@ -470,10 +466,12 @@ DEFAULT_CONFIG_INCLUDED_FTRACE_EVENTS = f'''\
 {COMMON_DEFAULT_ATRACE_EVENTS}
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 duration_ms: {DEFAULT_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 DEFAULT_CONFIG_OLD_ANDROID = f'''\
 {COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_VERBOSE
 {COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
 {COMMON_DEFAULT_SYS_EVENTS}
 
@@ -482,7 +480,8 @@ DEFAULT_CONFIG_OLD_ANDROID = f'''\
 {COMMON_DEFAULT_ATRACE_EVENTS}
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 duration_ms: {DEFAULT_DUR_MS}
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 COMMON_CUSTOM_CONFIG_BEGINNING_STRING = f'''\
 
@@ -523,10 +522,12 @@ duration_ms: {INVALID_DUR_MS}
 
 CUSTOM_CONFIG_NO_DUR_MS = f'''\
 {COMMON_CUSTOM_CONFIG_BEGINNING_STRING}
+
 {COMMON_CONFIG_ENDING_STRING}'''
 
 DEFAULT_CONFIG_NO_DUR_MS = f'''\
 {COMMON_DEFAULT_CONFIG_BEGINNING_STRING}
+      min_prio: PRIO_VERBOSE
 {COMMON_DEFAULT_CONFIG_SYS_STATS_BEGINNING}
 {COMMON_DEFAULT_SYS_EVENTS}
 {CPUFREQ_STRING_NEW_ANDROID}
@@ -535,7 +536,8 @@ DEFAULT_CONFIG_NO_DUR_MS = f'''\
 {COMMON_DEFAULT_ATRACE_EVENTS}
 {COMMON_DEFAULT_CONFIG_MIDDLE_STRING}
 
-{COMMON_CONFIG_ENDING_STRING}EOF'''
+{COMMON_CONFIG_ENDING_STRING}
+EOF'''
 
 
 class ConfigBuilderUnitTest(unittest.TestCase):
@@ -562,7 +564,6 @@ class ConfigBuilderUnitTest(unittest.TestCase):
     self.assertEqual(config, LIGHTWEIGHT_CONFIG_9000_DUR_MS)
 
   def test_build_memory_config_setting_valid_dur_ms(self):
-    self.maxDiff = None
     self.command.dur_ms = TEST_DUR_MS
 
     config, error = build_memory_config(self.command, ANDROID_SDK_VERSION_T)
