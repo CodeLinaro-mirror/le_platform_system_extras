@@ -18,6 +18,8 @@
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
+use flags_rust::GetServerConfigurableFlag;
+use rustutils::system_properties;
 
 #[derive(Parser)]
 #[command(about = "Command interface for profcollectd", long_about = None)]
@@ -36,6 +38,8 @@ enum Commands {
     Report,
     /// Clear all local data and reset the state.
     Reset,
+    /// Set property for profcollectd.
+    SetProperty,
 }
 
 #[derive(Args)]
@@ -67,6 +71,22 @@ fn main() -> Result<()> {
         Commands::Reset => {
             libprofcollectd::reset().context("Failed to reset.")?;
             println!("Reset done.");
+        }
+        Commands::SetProperty => {
+            let old_value = system_properties::read("persist.profcollectd.enabled")?
+                .unwrap_or("false".to_string());
+            let new_value =
+                match GetServerConfigurableFlag("profcollect_native_boot", "enabled", "false")
+                    .as_str()
+                {
+                    "1" | "y" | "yes" | "on" | "true" => "true",
+                    "0" | "n" | "no" | "off" | "false" => "false",
+                    invalid => anyhow::bail!("Failed to parse server flag as bool: {}", &invalid),
+                };
+
+            if old_value != new_value {
+                system_properties::write("persist.profcollectd.enabled", new_value)?;
+            }
         }
     }
     Ok(())
