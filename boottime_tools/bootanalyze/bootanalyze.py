@@ -530,6 +530,21 @@ def prepare_login_credentials():
   # Try to remove OOBE if it exists. In case this command fails, OOBE is not
   # running and we can proceed anyway.
   run_adb_shell_cmd_as_root('am start -a com.android.setupwizard.FOUR_CORNER_EXIT')
+
+  # Workaround for b/432346082, we need to fallback to main user workflow for
+  # user 10.
+  result, err = run_adb_shell_cmd_as_root('setprop fw.designate_main_user_on_boot true')
+  if err != 0:
+    raise Exception(
+        'Failed to fallback to main user mode: ' + result)
+  run_adb_shell_cmd_as_root('stop')
+  run_adb_shell_cmd_as_root('start')
+  # Make the changes persist across reboots.
+  result, err = run_adb_shell_cmd_as_root(
+      'aflags disable android.multiuser.demote_main_user')
+  if err != 0:
+    raise Exception(
+        'Failed to set the flag to disable mainless user mode: ' + result)
   result, err = run_adb_shell_cmd(
       'cmd lock_settings set-password --user 10 1234')
   if err != 0:
