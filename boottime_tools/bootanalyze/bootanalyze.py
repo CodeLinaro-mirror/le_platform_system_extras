@@ -956,9 +956,9 @@ def run_adb_cmd(cmd):
   try:
     result = subprocess.check_output(ADB_CMD + ' ' + cmd, shell=True).decode(
         'utf-8', 'ignore').strip()
-    return result, 0
+    return str(result), 0
   except subprocess.CalledProcessError as err:
-    return err.output, err.returncode
+    return str(err.output), err.returncode
 
 def run_adb_shell_cmd(cmd):
   return run_adb_cmd('shell ' + cmd)
