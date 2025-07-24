@@ -64,7 +64,7 @@ events:
   LauncherStart: START u0.*HOME.*(NexusLauncherActivity|GEL|LensPickerTrampolineActivity|SetupWizard|CarLauncher|launcher.*Launcher|LoginLauncherActivity)
   FsStat: fs_stat, partition:userdata stat:(0x\S+)
   CarWatchdogBootupProfilingComplete: Switching to PERIODIC_COLLECTION and PERIODIC_MONITOR
-  LoginStart: .*StartUnlock.*
+  LoginStart: .*keyguardDonePending.*10
   LoginEnd: .*LauncherReady\. User.*
 
 shutdown_events:
