@@ -157,6 +157,10 @@ cc_defaults {
         },
         windows: {
             enabled: true,
+            host_ldlibs: [
+                // Required by stack tracing code bundled with protobuf
+                "-ldbghelp",
+            ],
         },
     },
     use_version_lib: true,
