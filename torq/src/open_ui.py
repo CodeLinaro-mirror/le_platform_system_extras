@@ -21,6 +21,7 @@ import socketserver
 import http.server
 import os
 import subprocess
+import types
 from .handle_input import HandleInput
 from .utils import path_exists, wait_for_process_or_ctrl_c, wait_for_output
 from .validation_error import ValidationError
@@ -32,6 +33,7 @@ ANDROID_PERFETTO_TOOLS_DIR = "/external/perfetto/tools"
 ANDROID_TRACE_PROCESSOR = ANDROID_PERFETTO_TOOLS_DIR + TRACE_PROCESSOR_BINARY
 LARGE_FILE_SIZE = 1024 * 1024 * 1024 * 4  # 4 GiB
 WAIT_FOR_TRACE_PROCESSOR_MS = 3000
+MAX_SERVER_WAIT_TIME_SECS = 15
 
 
 class HttpHandler(http.server.SimpleHTTPRequestHandler):
@@ -115,17 +117,24 @@ def open_trace(path, origin, use_trace_processor):
           "CTRL+C to exit torq and close the trace_processor. #####\033[0m")
     wait_for_process_or_ctrl_c(process)
   else: # Open trace directly in UI
+
+    def handle_timeout(self):
+      self.timed_out = True
+      print("File server timed out while waiting for a request.")
+
     os.chdir(os.path.dirname(path))
     fname = os.path.basename(path)
     socketserver.TCPServer.allow_reuse_address = True
-    with (socketserver.TCPServer(("127.0.0.1", PORT), HttpHandler)
-          as httpd):
+    with (socketserver.TCPServer(("127.0.0.1", PORT), HttpHandler) as httpd):
       address = (f"{origin}/#!/?url=http://127.0.0.1:"
                  f"{PORT}/{fname}&referrer=open_trace_in_ui")
       webbrowser.open_new_tab(address)
       httpd.expected_fname = fname
+      httpd.handle_timeout = types.MethodType(handle_timeout, httpd)
       httpd.fname_get_completed = None
       httpd.allow_origin = origin
-      while httpd.fname_get_completed is None:
+      httpd.timeout = MAX_SERVER_WAIT_TIME_SECS
+      httpd.timed_out = False
+      while not httpd.timed_out and httpd.fname_get_completed is None:
         httpd.handle_request()
   return None
