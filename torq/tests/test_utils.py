@@ -14,6 +14,9 @@
 # limitations under the License.
 #
 
+import sys
+from src.torq import create_parser
+
 
 def parameterized(items, setup_func):
   """
@@ -43,3 +46,13 @@ def parameterized(items, setup_func):
 
 def parameterized_profiler(setup_func):
   return parameterized(["perfetto", "simpleperf"], setup_func)
+
+
+def create_parser_from_cli(command_string):
+  sys.argv = command_string.split()
+  return create_parser()
+
+
+def parse_cli(command_string):
+  parser = create_parser_from_cli(command_string)
+  return parser.parse_args()

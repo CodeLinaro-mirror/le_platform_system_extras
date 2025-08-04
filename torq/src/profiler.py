@@ -19,9 +19,7 @@ import datetime
 import os
 import time
 
-from .base import ANDROID_SDK_VERSION_T
-from .command import Command
-from .command_executor import CommandExecutor
+from .base import ANDROID_SDK_VERSION_T, Command, CommandExecutor, ValidationError
 from .config import PREDEFINED_PERFETTO_CONFIGS
 from .config_builder import build_custom_config
 from .device import SIMPLEPERF_TRACE_FILE, POLLING_INTERVAL_SECS
@@ -29,7 +27,6 @@ from .handle_input import HandleInput
 from .open_ui_utils import open_trace, WEB_UI_ADDRESS
 from .utils import convert_simpleperf_to_gecko
 from .validate_simpleperf import verify_simpleperf_args
-from .validation_error import ValidationError
 
 DEFAULT_DUR_MS = 10000
 DEFAULT_OUT_DIR = "."
@@ -300,6 +297,34 @@ def verify_profiler_args(args):
   return args, None
 
 
+def get_executor(event):
+  match event:
+    case "custom":
+      return ProfilerCommandExecutor()
+    case "user-switch":
+      return UserSwitchCommandExecutor()
+    case "boot":
+      return BootCommandExecutor()
+    case "app-startup":
+      return AppStartupCommandExecutor()
+    case _:
+      raise ValueError("Invalid event name was used.")
+
+
+def execute_profiler_command(args, device):
+  command = ProfilerCommand("profiler", args.event, args.profiler, args.out_dir,
+                            args.dur_ms, args.app, args.runs,
+                            args.simpleperf_event, args.perfetto_config,
+                            args.between_dur_ms, args.ui,
+                            args.excluded_ftrace_events,
+                            args.included_ftrace_events, args.from_user,
+                            args.to_user, args.scripts_path, args.symbols)
+
+  executor = get_executor(command.event)
+
+  return executor.execute(command, device)
+
+
 class ProfilerCommand(Command):
   """
   Represents commands which profile and trace the system.
@@ -326,18 +351,9 @@ class ProfilerCommand(Command):
     self.to_user = to_user
     self.scripts_path = scripts_path
     self.symbols = symbols
-    match event:
-      case "custom":
-        self.command_executor = ProfilerCommandExecutor()
-      case "user-switch":
-        self.original_user = None
-        self.command_executor = UserSwitchCommandExecutor()
-      case "boot":
-        self.command_executor = BootCommandExecutor()
-      case "app-startup":
-        self.command_executor = AppStartupCommandExecutor()
-      case _:
-        raise ValueError("Invalid event name was used.")
+
+    if self.event == "user-switch":
+      self.original_user = None
 
   def validate(self, device):
     print("Further validating arguments of ProfilerCommand.")
