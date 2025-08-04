@@ -338,12 +338,12 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 }
 #endif
 
-static u32 compute_block_size()
+static u32 compute_block_size(void)
 {
 	return 4096;
 }
 
-static u32 compute_journal_blocks()
+static u32 compute_journal_blocks(void)
 {
 	u32 journal_blocks = DIV_ROUND_UP(info.len, info.block_size) / 64;
 	if (journal_blocks < 1024)
@@ -395,7 +395,7 @@ static u32 compute_bg_desc_reserve_blocks()
 	return bg_desc_reserve_blocks;
 }
 
-void reset_ext4fs_info() {
+void reset_ext4fs_info(void) {
 	// Reset all the global data structures used by make_ext4fs so it
 	// can be called again.
 	memset(&info, 0, sizeof(info));
