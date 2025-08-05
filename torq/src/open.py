@@ -14,10 +14,9 @@
 # limitations under the License.
 #
 
-from .command import Command
+from .base import Command, ValidationError
 from .open_ui_utils import open_trace, WEB_UI_ADDRESS
 from .utils import path_exists
-from .validation_error import ValidationError
 
 
 def add_open_parser(subparsers):
@@ -44,18 +43,5 @@ def verify_open_args(args):
   return args, None
 
 
-class OpenCommand(Command):
-  """
-  Represents commands which open traces.
-  """
-
-  def __init__(self, file_path, use_trace_processor):
-    super().__init__(type)
-    self.file_path = file_path
-    self.use_trace_processor = use_trace_processor
-
-  def validate(self, device):
-    raise NotImplementedError
-
-  def execute(self, device):
-    return open_trace(self.file_path, WEB_UI_ADDRESS, self.use_trace_processor)
+def execute_open_command(args, device):
+  return open_trace(args.file_path, WEB_UI_ADDRESS, args.use_trace_processor)
