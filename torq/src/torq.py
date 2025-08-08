@@ -15,6 +15,7 @@
 #
 
 import argparse
+import sys
 
 from .config import (add_config_parser, execute_config_command,
                      verify_config_args, PREDEFINED_PERFETTO_CONFIGS)
@@ -22,6 +23,8 @@ from .device import AdbDevice
 from .open import (add_open_parser, execute_open_command, verify_open_args)
 from .profiler import (add_profiler_parser, execute_profiler_command,
                        verify_profiler_args)
+from .trigger import (add_trigger_parser, execute_trigger_command,
+                      verify_trigger_args)
 from .utils import set_default_subparser
 from .vm import add_vm_parser, execute_vm_command, verify_vm_args
 
@@ -47,6 +50,11 @@ TORQ_COMMANDS = {
         'parse': add_profiler_parser,
         'verify': verify_profiler_args,
         'execute': execute_profiler_command,
+    },
+    'trigger': {
+        'parse': add_trigger_parser,
+        'verify': verify_trigger_args,
+        'execute': execute_trigger_command,
     },
     'vm': {
         'parse': add_vm_parser,
@@ -89,9 +97,9 @@ def execute_command(args, device):
 
 
 def print_error(error):
-  print(error.message)
+  print(error.message, file=sys.stderr)
   if error.suggestion is not None:
-    print("Suggestion:\n\t", error.suggestion)
+    print(f"Suggestion:\n\t{error.suggestion}", file=sys.stderr)
 
 
 def run():
