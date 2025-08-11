@@ -32,6 +32,7 @@ labels in the pprof report, which can be used for filtering and analysis.
 
 import argparse
 import gzip
+import io
 import os
 import re
 import subprocess
@@ -308,15 +309,23 @@ def main(argv):
     command = f"adb shell '{device_script}'"
 
     try:
-      with subprocess.Popen(
+      result = subprocess.run(
           command,
           shell=True,
-          stdout=subprocess.PIPE,
+          capture_output=True,
           text=True,
           errors='ignore',
-      ) as p:
-        process_smaps_input(p.stdout, report_generator)
-    except (KeyboardInterrupt, BrokenPipeError):
+          check=True,
+      )
+      process_smaps_input(io.StringIO(result.stdout), report_generator)
+    except subprocess.CalledProcessError as e:
+      sys.stderr.write(
+          f'Error: adb shell command failed with exit code {e.returncode}.\n'
+      )
+      sys.stderr.write(f'Command: {e.cmd}\n')
+      sys.stderr.write(f'Stderr: {e.stderr}\n')
+      sys.exit(1)
+    except KeyboardInterrupt:
       print(
           '\nProcess interrupted. Generating report with data collected so far.'
       )
