@@ -38,6 +38,7 @@ import re
 import subprocess
 import sys
 
+# BEGIN profile_pb2 import
 try:
   import profile_pb2
 except ImportError:
@@ -45,6 +46,7 @@ except ImportError:
   ANDROID_BUILD_TOP = os.environ.get('ANDROID_BUILD_TOP')
   sys.path.append(ANDROID_BUILD_TOP + '/system/extras/simpleperf/scripts')
   import profile_pb2
+# END profile_pb2 import
 
 
 # Constants for marking process data boundaries.
