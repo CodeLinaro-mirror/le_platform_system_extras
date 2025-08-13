@@ -250,6 +250,7 @@ cc_defaults {
         "record_file_reader.cpp",
         "record_file_writer.cpp",
         "report_utils.cpp",
+        "SPEDecoder.cpp",
         "thread_tree.cpp",
         "tracing.cpp",
         "utils.cpp",

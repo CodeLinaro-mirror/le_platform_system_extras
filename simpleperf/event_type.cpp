@@ -662,4 +662,9 @@ std::unique_ptr<EventTypeAndModifier> ParseEventType(const std::string& event_ty
   return event_type_modifier;
 }
 
+bool IsSpeEventType(const perf_event_attr& attr) {
+  std::string event_name = GetEventNameByAttr(attr);
+  return IsSpeEventName(event_name);
+}
+
 }  // namespace simpleperf

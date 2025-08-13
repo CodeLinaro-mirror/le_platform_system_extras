@@ -148,6 +148,7 @@ class EventTypeManager {
 
 const EventType* FindEventTypeByName(const std::string& name, bool report_error = true);
 std::unique_ptr<EventTypeAndModifier> ParseEventType(const std::string& event_type_str);
+bool IsSpeEventType(const perf_event_attr& attr);
 
 }  // namespace simpleperf
 

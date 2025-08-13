@@ -65,6 +65,7 @@ static std::string RecordTypeToString(int record_type) {
       {PERF_RECORD_TRACING_DATA, "tracing_data"},
       {PERF_RECORD_AUXTRACE_INFO, "auxtrace_info"},
       {PERF_RECORD_AUXTRACE, "auxtrace"},
+      {PERF_RECORD_ITRACE_START, "itrace_start"},
       {SIMPLE_PERF_RECORD_KERNEL_SYMBOL, "kernel_symbol"},
       {SIMPLE_PERF_RECORD_DSO, "dso"},
       {SIMPLE_PERF_RECORD_SYMBOL, "symbol"},
@@ -590,16 +591,22 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
 
 SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip, uint32_t pid,
                            uint32_t tid, uint64_t time, uint32_t cpu, uint64_t period,
-                           const PerfSampleReadType& read_data, const std::vector<uint64_t>& ips,
-                           const std::vector<char>& stack, uint64_t dyn_stack_size) {
-  SetTypeAndMisc(PERF_RECORD_SAMPLE, PERF_RECORD_MISC_USER);
+                           uint64_t addr, const PerfSampleReadType& read_data,
+                           const std::vector<uint64_t>& ips, const std::vector<char>& stack,
+                           uint64_t dyn_stack_size, bool in_kernel,
+                           uint64_t additional_sample_type) {
+  SetTypeAndMisc(PERF_RECORD_SAMPLE, in_kernel ? PERF_RECORD_MISC_KERNEL : PERF_RECORD_MISC_USER);
   sample_type = attr.sample_type;
+  if (sample_type != 0) {
+    sample_type |= additional_sample_type;
+  }
   read_format = attr.read_format;
-  CHECK_EQ(0u,
-           sample_type & ~(PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
-                           PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_READ |
-                           PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_STACK_USER));
+  CHECK_EQ(0u, sample_type &
+                   ~(PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
+                     PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_READ | PERF_SAMPLE_ADDR |
+                     PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_STACK_USER));
   ip_data.ip = ip;
+  addr_data.addr = addr;
   tid_data.pid = pid;
   tid_data.tid = tid;
   time_data.time = time;
@@ -620,6 +627,9 @@ SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip
   uint32_t size = header_size();
   if (sample_type & PERF_SAMPLE_IP) {
     size += sizeof(ip_data);
+  }
+  if (sample_type & PERF_SAMPLE_ADDR) {
+    size += sizeof(addr_data);
   }
   if (sample_type & PERF_SAMPLE_TID) {
     size += sizeof(tid_data);
@@ -659,6 +669,9 @@ SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip
   MoveToBinaryFormat(header, p);
   if (sample_type & PERF_SAMPLE_IP) {
     MoveToBinaryFormat(ip_data, p);
+  }
+  if (sample_type & PERF_SAMPLE_ADDR) {
+    MoveToBinaryFormat(addr_data, p);
   }
   if (sample_type & PERF_SAMPLE_TID) {
     MoveToBinaryFormat(tid_data, p);

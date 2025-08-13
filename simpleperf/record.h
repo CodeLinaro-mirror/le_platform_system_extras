@@ -406,9 +406,10 @@ struct SampleRecord : public Record {
 
   SampleRecord() {}
   SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip, uint32_t pid, uint32_t tid,
-               uint64_t time, uint32_t cpu, uint64_t period, const PerfSampleReadType& read_data,
-               const std::vector<uint64_t>& ips, const std::vector<char>& stack,
-               uint64_t dyn_stack_size);
+               uint64_t time, uint32_t cpu, uint64_t period, uint64_t addr,
+               const PerfSampleReadType& read_data, const std::vector<uint64_t>& ips,
+               const std::vector<char>& stack, uint64_t dyn_stack_size, bool in_kernel = false,
+               uint64_t additional_sample_type = 0);
 
   bool Parse(const perf_event_attr& attr, char* p, char* end) override;
   void ReplaceRegAndStackWithCallChain(const std::vector<uint64_t>& ips);
