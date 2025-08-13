@@ -44,7 +44,11 @@ try:
 except ImportError:
   # Allow running the script from a checkout, not as a python_binary_host
   ANDROID_BUILD_TOP = os.environ.get('ANDROID_BUILD_TOP')
-  sys.path.append(ANDROID_BUILD_TOP + '/system/extras/simpleperf/scripts')
+  if ANDROID_BUILD_TOP:
+    import_path = ANDROID_BUILD_TOP + '/system/extras/simpleperf/scripts'
+  else:
+    import_path = os.getcwd() + '/system/extras/simpleperf/scripts'
+  sys.path.append(import_path)
   import profile_pb2
 # END profile_pb2 import
 
@@ -182,6 +186,31 @@ class PprofReportGenerator:
       f.write(self.profile.SerializeToString())
 
 
+def run_command(command):
+  """Helper to run a shell command with common parameters."""
+  try:
+    return subprocess.run(
+        command,
+        shell=True,
+        capture_output=True,
+        text=True,
+        check=True,
+        errors='ignore',
+    )
+  except subprocess.CalledProcessError as e:
+    sys.stderr.write(
+        f'Error: Command failed with exit code {e.returncode}.\n'
+    )
+    sys.stderr.write(f'Command: {e.cmd}\n')
+    sys.stderr.write(f'Stderr: {e.stderr}\n')
+    sys.exit(1)
+  except FileNotFoundError:
+    sys.stderr.write(
+        f"Error: Command '{command.split()[0]}' not found. Please ensure it is in your PATH.\n"
+    )
+    sys.exit(1)
+
+
 def parse_process_chunk(process_chunk, proc_name):
   """Parses a chunk of smaps data for a single process.
 
@@ -260,8 +289,28 @@ def process_smaps_input(input_stream, report_generator):
   print()
 
 
+def ensure_adb_root():
+  """Ensures adb connection has root access.
+
+  Raises:
+    subprocess.CalledProcessError: If an adb command fails.
+    FileNotFoundError: If 'adb' command is not found.
+    SystemExit: If root access cannot be obtained.
+  """ # Attempt to restart adbd as root. This command will block until adbd restarts.
+  run_command('adb root')
+  # Wait for the device to reconnect after adb root.
+  run_command('adb wait-for-device')
+  # Verify root access by checking the user ID.
+  result_id = run_command('adb shell id -u')
+  if not result_id or result_id.stdout.strip() != '0':
+    sys.stderr.write(
+        'Error: Failed to get root access via adb. Please ensure your device'
+        ' is rooted or adbd can be restarted as root.\n'
+    )
+    sys.exit(1)
+
+
 def main(argv):
-  """Main function."""
   parser = argparse.ArgumentParser(
       description=(
           'Generate a pprof file of all smaps metrics for all processes.'
@@ -286,7 +335,10 @@ def main(argv):
     except FileNotFoundError:
       sys.stderr.write(f'Error: smaps file not found at {args.smaps}.\n')
       sys.exit(1)
+  # If --smaps is not provided, we need to connect to a device via adb.
   else:
+    ensure_adb_root()
+
     if args.pid:
       device_script = f"""
       pid={args.pid}
@@ -310,33 +362,16 @@ def main(argv):
       """
     command = f"adb shell '{device_script}'"
 
-    try:
-      result = subprocess.run(
-          command,
-          shell=True,
-          capture_output=True,
-          text=True,
-          errors='ignore',
-          check=True,
-      )
-      process_smaps_input(io.StringIO(result.stdout), report_generator)
-    except subprocess.CalledProcessError as e:
-      sys.stderr.write(
-          f'Error: adb shell command failed with exit code {e.returncode}.\n'
-      )
-      sys.stderr.write(f'Command: {e.cmd}\n')
-      sys.stderr.write(f'Stderr: {e.stderr}\n')
-      sys.exit(1)
-    except KeyboardInterrupt:
-      print(
-          '\nProcess interrupted. Generating report with data collected so far.'
-      )
+    result = run_command(command)
+    process_smaps_input(io.StringIO(result.stdout), report_generator)
 
   print(f'Generating pprof report to {args.output}...')
   report_generator.write_report(args.output, sys.argv)
 
   print('Done.')
   print(f'Report saved to: {os.path.abspath(args.output)}')
+  print(f'Tip: To upload to pprof web UI, run:')
+  print(f'pprof -flame {os.path.abspath(args.output)}')
 
 
 if __name__ == '__main__':
