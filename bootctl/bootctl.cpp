@@ -223,7 +223,6 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Failed to get bootctl module.\n");
         return EX_SOFTWARE;
     }
-    const auto bootVersion = client->GetVersion();
 
     if (argc < 2) {
         usage(stderr, argc, argv);
