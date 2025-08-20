@@ -40,7 +40,7 @@
 
 static struct block_allocation* saved_allocation_head = NULL;
 
-struct block_allocation* get_saved_allocation_chain() {
+struct block_allocation* get_saved_allocation_chain(void) {
 	return saved_allocation_head;
 }
 
@@ -397,11 +397,11 @@ static struct ext4_xattr_entry* xattr_addto_range(
 
 	char *val = (char *) new_entry + available_size - EXT4_XATTR_SIZE(value_len);
 	size_t e_value_offs = val - (char *) block_start;
-
 	new_entry->e_value_offs = cpu_to_le16(e_value_offs);
-	memset(val, 0, EXT4_XATTR_SIZE(value_len));
-	memcpy(val, value, value_len);
-
+	if (available_size >= EXT4_XATTR_SIZE(value_len)) {
+	    memset(val, 0, EXT4_XATTR_SIZE(value_len));
+	    memcpy(val, value, value_len);
+        }
 	xattr_assert_sane(first);
 	return new_entry;
 }
