@@ -455,6 +455,7 @@ bool RecordFileWriter::WriteBranchStackFeature() {
 
 bool RecordFileWriter::WriteAuxTraceFeature(const std::vector<uint64_t>& auxtrace_offset) {
   std::vector<uint64_t> data;
+  data.push_back(auxtrace_offset.size());
   for (auto offset : auxtrace_offset) {
     data.push_back(offset);
     data.push_back(AuxTraceRecord::Size());
