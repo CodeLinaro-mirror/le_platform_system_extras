@@ -1084,7 +1084,7 @@ TEST(record_cmd, cs_etm_event) {
     return;
   }
   TemporaryFile tmpfile;
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm"}, tmpfile.path));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u"}, tmpfile.path));
   std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(tmpfile.path);
   ASSERT_TRUE(reader);
 
@@ -1115,7 +1115,7 @@ TEST(record_cmd, cs_etm_event) {
   reader.reset();
 
   // We can explicitly use ETR. Because ETR is ready after CheckEtmSupport().
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm/@tmc_etr0/"}, tmpfile.path));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm/@tmc_etr0/:u"}, tmpfile.path));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1153,11 +1153,11 @@ TEST(record_cmd, aux_buffer_size_option) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--aux-buffer-size", "1m"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--aux-buffer-size", "1m"}));
   // not page size aligned
-  ASSERT_FALSE(RunRecordCmd({"-e", "cs-etm", "--aux-buffer-size", "1024"}));
+  ASSERT_FALSE(RunRecordCmd({"-e", "cs-etm:u", "--aux-buffer-size", "1024"}));
   // not power of two
-  ASSERT_FALSE(RunRecordCmd({"-e", "cs-etm", "--aux-buffer-size", "12k"}));
+  ASSERT_FALSE(RunRecordCmd({"-e", "cs-etm:u", "--aux-buffer-size", "12k"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1178,7 +1178,7 @@ TEST(record_cmd, addr_filter_option) {
   // --addr-filter doesn't apply to cpu-cycles.
   ASSERT_FALSE(RunRecordCmd({"--addr-filter", "filter " + sleep_exec_path}));
   TemporaryFile record_file;
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", "filter " + sleep_exec_path},
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", "filter " + sleep_exec_path},
                            record_file.path));
   TemporaryFile inject_file;
   ASSERT_TRUE(
@@ -1208,26 +1208,26 @@ TEST(record_cmd, addr_filter_option) {
   uint64_t addr = elf->ReadMinExecutableVaddr(&off);
   // file start
   std::string filter = StringPrintf("start 0x%" PRIx64 "@%s", addr, sleep_exec_path.c_str());
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // file stop
   filter = StringPrintf("stop 0x%" PRIx64 "@%s", addr, sleep_exec_path.c_str());
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // file range
   filter = StringPrintf("filter 0x%" PRIx64 "-0x%" PRIx64 "@%s", addr, addr + 4,
                         sleep_exec_path.c_str());
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // If kernel panic, try backporting "perf/core: Fix crash when using HW tracing kernel
   // filters".
   // kernel start
   uint64_t fake_kernel_addr = (1ULL << 63);
   filter = StringPrintf("start 0x%" PRIx64, fake_kernel_addr);
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // kernel stop
   filter = StringPrintf("stop 0x%" PRIx64, fake_kernel_addr);
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // kernel range
   filter = StringPrintf("filter 0x%" PRIx64 "-0x%" PRIx64, fake_kernel_addr, fake_kernel_addr + 4);
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--addr-filter", filter}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1236,8 +1236,8 @@ TEST(record_cmd, decode_etm_option) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--decode-etm"}));
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--decode-etm", "--exclude-perf"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--decode-etm"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--decode-etm", "--exclude-perf"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1246,7 +1246,7 @@ TEST(record_cmd, record_timestamp) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--record-timestamp"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--record-timestamp"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1255,7 +1255,7 @@ TEST(record_cmd, record_cycles) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--record-cycles"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--record-cycles"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1264,7 +1264,7 @@ TEST(record_cmd, cycle_threshold) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--record-cycles", "--cycle-threshold", "8"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--record-cycles", "--cycle-threshold", "8"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1273,7 +1273,7 @@ TEST(record_cmd, binary_option) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--decode-etm", "--binary", ".*"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--decode-etm", "--binary", ".*"}));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1282,7 +1282,7 @@ TEST(record_cmd, etm_flush_interval_option) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "--etm-flush-interval", "10"}));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--etm-flush-interval", "10"}));
 }
 
 TEST(record_cmd, etm_uses_vdso) {
@@ -1291,7 +1291,7 @@ TEST(record_cmd, etm_uses_vdso) {
     return;
   }
   TemporaryFile record_file;
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm"}, record_file.path));
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u"}, record_file.path));
   TemporaryFile inject_file;
   ASSERT_TRUE(CreateCommandInstance("inject")->Run(
       {"-i", record_file.path, "-o", inject_file.path, "--binary", "\\[vdso\\]"}));

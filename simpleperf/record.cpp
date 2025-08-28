@@ -1108,7 +1108,7 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
   data = reinterpret_cast<DataType*>(p);
   CHECK_SIZE(p, end, sizeof(*data));
   p += sizeof(*data);
-  if (data->aux_type != AUX_TYPE_ETM || data->version != 1) {
+  if (data->aux_type != AUX_TYPE_ETM || data->version > 2) {
     return false;
   }
   for (uint32_t i = 0; i < data->nr_cpu; ++i) {
@@ -1116,10 +1116,12 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
     uint64_t magic = *reinterpret_cast<uint64_t*>(p);
     if (magic == MAGIC_ETM4) {
       CHECK_SIZE(p, end, sizeof(ETM4Info));
-      p += sizeof(ETM4Info);
+      ETM4Info& e = *reinterpret_cast<ETM4Info*>(p);
+      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
     } else if (magic == MAGIC_ETE) {
       CHECK_SIZE(p, end, sizeof(ETEInfo));
-      p += sizeof(ETEInfo);
+      ETEInfo& e = *reinterpret_cast<ETEInfo*>(p);
+      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
     } else {
       return false;
     }
@@ -1175,7 +1177,7 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcidr2 0x%" PRIx64 "\n", e.trcidr2);
       PrintIndented(indent, "trcidr8 0x%" PRIx64 "\n", e.trcidr8);
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
-      info = reinterpret_cast<uint64_t*>(&e + 1);
+      info += e.nrtrcparams + 3;
     } else {
       CHECK_EQ(info[0], MAGIC_ETE);
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(info);
@@ -1190,7 +1192,7 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcidr8 0x%" PRIx64 "\n", e.trcidr8);
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
       PrintIndented(indent, "trcdevarch 0x%" PRIx64 "\n", e.trcdevarch);
-      info = reinterpret_cast<uint64_t*>(&e + 1);
+      info += e.nrtrcparams + 3;
     }
   }
 }
