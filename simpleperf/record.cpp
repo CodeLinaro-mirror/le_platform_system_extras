@@ -1108,7 +1108,8 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
   data = reinterpret_cast<DataType*>(p);
   CHECK_SIZE(p, end, sizeof(*data));
   p += sizeof(*data);
-  if (data->aux_type != AUX_TYPE_ETM || data->version > 2) {
+  if (!((data->aux_type == AUX_TYPE_ETM && data->version <= 2) ||
+        (data->aux_type == AUX_TYPE_SPE && data->version == 1))) {
     return false;
   }
   for (uint32_t i = 0; i < data->nr_cpu; ++i) {
@@ -1122,6 +1123,9 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
       CHECK_SIZE(p, end, sizeof(ETEInfo));
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(p);
       p += (e.nrtrcparams + 3) * sizeof(uint64_t);
+    } else if (magic == MAGIC_SPE) {
+      CHECK_SIZE(p, end, sizeof(SPEInfo));
+      p += sizeof(SPEInfo);
     } else {
       return false;
     }
@@ -1155,6 +1159,21 @@ AuxTraceInfoRecord::AuxTraceInfoRecord(const DataType& data, const std::vector<E
   UpdateBinary(new_binary);
 }
 
+AuxTraceInfoRecord::AuxTraceInfoRecord(const DataType& data, const std::vector<SPEInfo>& spe_info) {
+  SetTypeAndMisc(PERF_RECORD_AUXTRACE_INFO, 0);
+
+  uint32_t size = header_size() + sizeof(DataType);
+  size += sizeof(SPEInfo) * spe_info.size();
+  SetSize(size);
+  char* new_binary = new char[size];
+  char* p = new_binary;
+  MoveToBinaryFormat(header, p);
+  this->data = reinterpret_cast<DataType*>(p);
+  MoveToBinaryFormat(data, p);
+  MoveToBinaryFormat(spe_info.data(), spe_info.size(), p);
+  UpdateBinary(new_binary);
+}
+
 void AuxTraceInfoRecord::DumpData(size_t indent) const {
   PrintIndented(indent, "aux_type %u\n", data->aux_type);
   PrintIndented(indent, "version %" PRIu64 "\n", data->version);
@@ -1178,8 +1197,7 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcidr8 0x%" PRIx64 "\n", e.trcidr8);
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
       info += e.nrtrcparams + 3;
-    } else {
-      CHECK_EQ(info[0], MAGIC_ETE);
+    } else if (info[0] == MAGIC_ETE) {
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(info);
       PrintIndented(indent, "magic 0x%" PRIx64 "\n", e.magic);
       PrintIndented(indent, "cpu %" PRIu64 "\n", e.cpu);
@@ -1193,6 +1211,15 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
       PrintIndented(indent, "trcdevarch 0x%" PRIx64 "\n", e.trcdevarch);
       info += e.nrtrcparams + 3;
+    } else {
+      CHECK_EQ(info[0], MAGIC_SPE);
+      SPEInfo& e = *reinterpret_cast<SPEInfo*>(info);
+      PrintIndented(indent, "magic 0x%" PRIx64 "\n", e.magic);
+      PrintIndented(indent, "cpu %" PRIu64 "\n", e.cpu);
+      PrintIndented(indent, "cap_min_ival 0x%" PRIx64 "\n", e.cap_min_ival);
+      PrintIndented(indent, "cpu_midr 0x%" PRIx64 "\n", e.cpu_midr);
+      PrintIndented(indent, "enabled 0x%" PRIx64 "\n", e.enabled);
+      info = reinterpret_cast<uint64_t*>(&e + 1);
     }
   }
 }

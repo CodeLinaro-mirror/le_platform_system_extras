@@ -284,6 +284,7 @@ cc_defaults {
                 "ProbeEvents.cpp",
                 "read_dex_file.cpp",
                 "RecordReadThread.cpp",
+                "SPERecorder.cpp",
                 "workload.cpp",
             ],
         },

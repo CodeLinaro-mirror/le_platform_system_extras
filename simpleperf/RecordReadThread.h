@@ -246,6 +246,7 @@ class RecordReadThread {
   std::vector<KernelRecordReader> kernel_record_readers_;
   pid_t exclude_pid_ = -1;
 
+  bool has_aux_events_ = false;
   // ETM related members
   bool has_etm_events_ = false;
   ETMDataRateLimiter etm_data_rate_limiter_;
