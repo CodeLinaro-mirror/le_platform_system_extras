@@ -33,7 +33,7 @@ TEST(get_all_events, smoke) {
 }
 
 static void DoSomeWork() {
-  for (volatile int i = 0; i < 100000000; ++i) {
+  for (volatile int i = 0; i < 100000000; i += 1) {
   }
 }
 
