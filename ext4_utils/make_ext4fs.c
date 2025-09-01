@@ -256,8 +256,12 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 	if (needs_lost_and_found) {
 		/* insert a lost+found directory at the beginning of the dentries */
 		struct dentry *tmp = calloc(entries + 1, sizeof(struct dentry));
+		if (tmp == NULL)
+		    critical_error_errno("calloc");
+
 		memset(tmp, 0, (entries + 1) * sizeof(struct dentry));
-		memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
+		if (entries != 0)
+		    memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
 		dentries = tmp;
 
 		dentries[0].filename = strdup("lost+found");

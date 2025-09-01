@@ -398,7 +398,7 @@ static struct ext4_xattr_entry* xattr_addto_range(
 	char *val = (char *) new_entry + available_size - EXT4_XATTR_SIZE(value_len);
 	size_t e_value_offs = val - (char *) block_start;
 	new_entry->e_value_offs = cpu_to_le16(e_value_offs);
-	if (available_size >= EXT4_XATTR_SIZE(value_len)) {
+	if (available_size >= EXT4_XATTR_SIZE(value_len) && EXT4_XATTR_SIZE(value_len) != 0) {
 	    memset(val, 0, EXT4_XATTR_SIZE(value_len));
 	    memcpy(val, value, value_len);
         }
