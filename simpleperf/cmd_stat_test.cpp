@@ -114,7 +114,7 @@ TEST(stat_cmd, event_modifier) {
 
 void RunWorkloadFunction() {
   while (true) {
-    for (volatile int i = 0; i < 10000; ++i);
+    for (volatile int i = 0; i < 10000; i += 1);
     usleep(1);
   }
 }
