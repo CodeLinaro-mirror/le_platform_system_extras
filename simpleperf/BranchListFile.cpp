@@ -383,23 +383,20 @@ bool BranchListProtoWriter::Write(const ETMBinaryMap& etm_data) {
     }
     for (const auto& [addr, branch_map] : binary.branch_map) {
       add_proto_addr(addr);
-      size_t new_branch_count = 0;
-      for (const auto& [branch, _] : branch_map) {
-        new_branch_count += branch.size();
-      }
-      if (branch_count + new_branch_count > max_branches_per_message_) {
-        if (!WriteProtoBranchList(*proto_branch_list)) {
-          return false;
-        }
-        proto_branch_list.reset(new proto::BranchList);
-        if (!add_proto_binary(key, binary)) {
-          return false;
-        }
-        add_proto_addr(addr);
-        branch_count = 0;
-      }
-      branch_count += new_branch_count;
       for (const auto& [branch, count] : branch_map) {
+        if (branch_count + branch.size() > max_branches_per_message_ && branch_count != 0) {
+          if (!WriteProtoBranchList(*proto_branch_list)) {
+            return false;
+          }
+          proto_branch_list.reset(new proto::BranchList);
+          if (!add_proto_binary(key, binary)) {
+            return false;
+          }
+          add_proto_addr(addr);
+          branch_count = 0;
+        }
+        branch_count += branch.size();
+
         proto::ETMBinary_Address_Branch* proto_branch = proto_addr->add_branches();
         proto_branch->set_branch(ETMBranchToProtoString(branch));
         proto_branch->set_branch_size(branch.size());
@@ -613,6 +610,20 @@ bool BranchListProtoReader::ReadProtoBranchList(uint32_t size,
   if (!proto_branch_list.ParseFromString(s)) {
     PLOG(ERROR) << "failed to read ETMBranchList msg";
     return false;
+  }
+  if (calculate_max_branches_per_message_) {
+    size_t branch_count = 0;
+    for (size_t i = 0; i < proto_branch_list.etm_data_size(); i++) {
+      const proto::ETMBinary& proto_binary = proto_branch_list.etm_data(i);
+      for (size_t j = 0; j < proto_binary.addrs_size(); j++) {
+        const auto& proto_addr = proto_binary.addrs(j);
+        for (size_t k = 0; k < proto_addr.branches_size(); k++) {
+          const auto& proto_branch = proto_addr.branches(k);
+          branch_count += proto_branch.branch_size();
+        }
+      }
+    }
+    max_branches_per_message_ = std::max(max_branches_per_message_, branch_count);
   }
   return true;
 }
