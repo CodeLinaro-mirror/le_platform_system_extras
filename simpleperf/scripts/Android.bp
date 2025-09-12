@@ -51,3 +51,14 @@ python_library_host {
         canonical_path_from_root: false,
     },
 }
+
+python_binary_host {
+    name: "pprof_proto_generator",
+    srcs: [
+        "pprof_proto_generator.py",
+    ],
+    libs: [
+        "profile_py_pb2",
+        "simpleperf_report_lib",
+    ],
+}
