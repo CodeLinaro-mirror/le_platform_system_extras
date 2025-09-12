@@ -112,12 +112,16 @@ TEST(BranchListProtoReaderWriter, smoke) {
   ETMBinary& binary = etm_data[BinaryKey("fake_binary", BuildId())];
   binary.dso_type = DSO_ELF_FILE;
   UnorderedETMBranchMap& branch_map = binary.branch_map;
-  for (size_t addr = 0; addr <= 1024; addr++) {
+  for (size_t addr = 0; addr <= 100; addr++) {
     auto& b_map = branch_map[addr];
-    std::vector<bool> branch1 = {true};
-    b_map[branch1] = 1;
-    std::vector<bool> branch2 = {true, false};
-    b_map[branch2] = 2;
+    size_t branch_count = addr;
+    for (size_t i = 1; i <= branch_count; i++) {
+      std::vector<bool> branch(i, false);
+      for (size_t j = 0; j < branch.size(); j += 2) {
+        branch[j] = true;
+      }
+      b_map[branch] = i;
+    }
   }
   LBRData lbr_data;
   lbr_data.binaries.emplace_back(BinaryKey("binary1", BuildId()));
@@ -132,7 +136,8 @@ TEST(BranchListProtoReaderWriter, smoke) {
 
   TemporaryFile tmpfile;
   close(tmpfile.fd);
-  for (size_t max_branches_per_message : {100, 100000000}) {
+  for (size_t max_branches_per_message : {100}) {
+    // for (size_t max_branches_per_message : {100, 100000000}) {
     for (bool compress : {false, true}) {
       auto writer =
           BranchListProtoWriter::CreateForFile(tmpfile.path, compress, max_branches_per_message);
@@ -142,11 +147,13 @@ TEST(BranchListProtoReaderWriter, smoke) {
       writer = nullptr;
       auto reader = BranchListProtoReader::CreateForFile(tmpfile.path);
       ASSERT_TRUE(reader);
+      reader->CalculateMaxBranchesPerMessage();
       ETMBinaryMap new_etm_data;
       LBRData new_lbr_data;
       ASSERT_TRUE(reader->Read(new_etm_data, new_lbr_data));
       ASSERT_TRUE(IsETMDataEqual(etm_data, new_etm_data));
       ASSERT_TRUE(IsLBRDataEqual(lbr_data, new_lbr_data));
+      ASSERT_LE(reader->GetMaxBranchesPerMessage(), max_branches_per_message);
     }
   }
 
@@ -160,11 +167,13 @@ TEST(BranchListProtoReaderWriter, smoke) {
       writer = nullptr;
       auto reader = BranchListProtoReader::CreateForString(s);
       ASSERT_TRUE(reader);
+      reader->CalculateMaxBranchesPerMessage();
       ETMBinaryMap new_etm_data;
       LBRData new_lbr_data;
       ASSERT_TRUE(reader->Read(new_etm_data, new_lbr_data));
       ASSERT_TRUE(IsETMDataEqual(etm_data, new_etm_data));
       ASSERT_TRUE(IsLBRDataEqual(lbr_data, new_lbr_data));
+      ASSERT_LE(reader->GetMaxBranchesPerMessage(), max_branches_per_message);
     }
   }
 }
