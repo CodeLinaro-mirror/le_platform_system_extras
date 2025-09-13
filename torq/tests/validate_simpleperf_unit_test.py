@@ -145,7 +145,7 @@ class ValidateSimpleperfUnitTest(unittest.TestCase):
                                                        mock_isdir, mock_exists):
     mock_isdir.return_value = True
     mock_input.return_value = "y"
-    mock_exists.side_effect = [False, True]
+    mock_exists.side_effect = [False, True, True, True, True]
     mock_subprocess_run.return_value = None
     args = parse_cli("torq -p simpleperf")
 
