@@ -52,6 +52,10 @@ rust_binary {
         "libanyhow",
         "libclap",
         "libprofcollectd",
+        "librustutils",
+    ],
+    rlibs: [
+        "libflags_rust",
     ],
 }
 

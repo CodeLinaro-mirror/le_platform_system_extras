@@ -94,10 +94,12 @@ in AutoFDO to build create_llvm_prof, then use `create_llvm_prof` to create prof
 
 ```sh
 # perf_inject_binary1.data is split from perf_inject.data, and only contains branch info for binary1.
-host $ create_llvm_prof -profile perf_inject_binary1.data -profiler text -binary path_of_binary1 -out a.prof -format binary
+host $ create_llvm_prof -profile perf_inject_binary1.data -profiler text -binary path_of_binary1 \
+       -out a.prof -format extbinary
 
 # perf_inject_kernel.data is split from perf_inject.data, and only contains branch info for [kernel.kallsyms].
-host $ create_llvm_prof -profile perf_inject_kernel.data -profiler text -binary vmlinux -out a.prof -format binary
+host $ create_llvm_prof -profile perf_inject_kernel.data -profiler text -binary vmlinux \
+       -out a.prof -format extbinary --prof_sym_list=false
 ```
 
 Then we can use a.prof for PGO during compilation, via `-fprofile-sample-use=a.prof`.
@@ -139,7 +141,8 @@ simpleperf I cmd_record.cpp:879] Aux data traced: 1,134,720
 ```sh
 # Build simpleperf tool on host.
 (host) <AOSP>$ make simpleperf_ndk
-(host) <AOSP>$ simpleperf inject -i branch_list.data -o perf_inject_etm_test_loop.data --symdir out/target/product/generic_arm64/symbols/system/bin
+(host) <AOSP>$ simpleperf inject -i branch_list.data -o perf_inject_etm_test_loop.data \
+               --symdir out/target/product/generic_arm64/symbols/system/bin
 (host) <AOSP>$ cat perf_inject_etm_test_loop.data
 14
 4000-4010:1
@@ -149,7 +152,9 @@ simpleperf I cmd_record.cpp:879] Aux data traced: 1,134,720
 // build_id: 0xa6fc5b506adf9884cdb680b4893c505a00000000
 // /data/local/tmp/etm_test_loop
 
-(host) <AOSP>$ create_llvm_prof -profile perf_inject_etm_test_loop.data -profiler text -binary out/target/product/generic_arm64/symbols/system/bin/etm_test_loop -out etm_test_loop.afdo -format binary
+(host) <AOSP>$ create_llvm_prof -profile perf_inject_etm_test_loop.data -profiler text \
+               -binary out/target/product/generic_arm64/symbols/system/bin/etm_test_loop \
+               -out etm_test_loop.afdo -format extbinary
 (host) <AOSP>$ ls -lh etm_test_loop.afdo
 rw-r--r-- 1 user group 241 Apr 30 09:52 etm_test_loop.afdo
 ```
@@ -252,8 +257,11 @@ section for more information.
 (host) $ ls -lh kernel.autofdo
 -rw-r--r-- 1 yabinc primarygroup 1.3M Oct 17 16:39 kernel.autofdo
 # Convert the AutoFDO profile to the LLVM profile format:
+# The --prof_sym_list=false flag is important for kernel profiles. Without it, clang
+# assumes any function not listed in the profile is cold. This can lead to unwanted
+# deoptimizations, even when -fprofile-sample-accurate is not enabled.
 (host) $ create_llvm_prof --profiler text --binary=vmlinux --profile=kernel.autofdo \
-				--out=kernel.llvm_profdata --format extbinary
+				--out=kernel.llvm_profdata --prof_sym_list=false --format extbinary
 (host) $ ls -lh kernel.llvm_profdata
 -rw-r--r-- 1 yabinc primarygroup 1.4M Oct 17 19:00 kernel.llvm_profdata
 ```

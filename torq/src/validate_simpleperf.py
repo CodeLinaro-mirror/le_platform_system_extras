@@ -18,17 +18,18 @@ import os
 import subprocess
 from .base import ValidationError
 from .handle_input import HandleInput
-from .utils import path_exists, dir_exists, TORQ_TEMP_DIR
+from .utils import path_exists, dir_exists, is_bazel
 
-TEMP_CACHE_BUILDER_SCRIPT = TORQ_TEMP_DIR + "/binary_cache_builder.py"
+TORQ_TEMP_DIR = "/tmp/.torq"
 SIMPLEPERF_SCRIPTS_DIR = "/system/extras/simpleperf/scripts"
 BUILDER_SCRIPT = SIMPLEPERF_SCRIPTS_DIR + "/binary_cache_builder.py"
 
 
 def verify_simpleperf_args(args):
   args.scripts_path = TORQ_TEMP_DIR
-  if ("ANDROID_BUILD_TOP" in os.environ and
-      path_exists(os.environ["ANDROID_BUILD_TOP"] + BUILDER_SCRIPT)):
+  if not is_bazel() and ("ANDROID_BUILD_TOP" in os.environ and
+                         path_exists(os.environ["ANDROID_BUILD_TOP"] +
+                                     BUILDER_SCRIPT)):
     args.scripts_path = (
         os.environ["ANDROID_BUILD_TOP"] + SIMPLEPERF_SCRIPTS_DIR)
 
@@ -54,8 +55,7 @@ def verify_simpleperf_args(args):
           "(<ANDROID_BUILD_TOP>/out/target/product/<TARGET>).")
     args.symbols = os.environ["ANDROID_PRODUCT_OUT"]
 
-  if (args.scripts_path != TORQ_TEMP_DIR or
-      path_exists(TEMP_CACHE_BUILDER_SCRIPT)):
+  if args.scripts_path != TORQ_TEMP_DIR or temp_simpleperf_scripts_exist():
     return args, None
 
   error = download_simpleperf_scripts()
@@ -81,7 +81,7 @@ def download_simpleperf_scripts():
          (TORQ_TEMP_DIR, TORQ_TEMP_DIR, TORQ_TEMP_DIR, TORQ_TEMP_DIR)),
         shell=True)
 
-    if not path_exists(TEMP_CACHE_BUILDER_SCRIPT):
+    if not temp_simpleperf_scripts_exist():
       raise Exception("Error while downloading simpleperf scripts. Try again "
                       "or set $ANDROID_BUILD_TOP to your android root path and "
                       "make sure you have $ANDROID_BUILD_TOP/system/extras/"
@@ -100,3 +100,11 @@ def download_simpleperf_scripts():
                            "y": download_accepted_callback,
                            "n": rejected_callback
                        }).handle_input())
+
+
+def temp_simpleperf_scripts_exist():
+  return path_exists(
+      TORQ_TEMP_DIR + "/binary_cache_builder.py") and path_exists(
+          TORQ_TEMP_DIR + "/gecko_profile_generator.py") and path_exists(
+              TORQ_TEMP_DIR + "/simpleperf_utils.py") and path_exists(
+                  TORQ_TEMP_DIR + "/simpleperf_report_lib.py")
