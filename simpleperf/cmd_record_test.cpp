@@ -37,6 +37,7 @@
 #include "ETMRecorder.h"
 #include "JITDebugReader.h"
 #include "ProbeEvents.h"
+#include "SPERecorder.h"
 #include "cmd_record_impl.h"
 #include "command.h"
 #include "environment.h"
@@ -1076,6 +1077,50 @@ TEST(record_cmd, check_trampoline_after_art_jni_methods) {
 // @CddTest = 6.1/C-0-2
 TEST(record_cmd, no_cut_samples_option) {
   ASSERT_TRUE(RunRecordCmd({"--no-cut-samples"}));
+}
+
+TEST(record_cmd, arm_spe_event) {
+  const simpleperf::EventType* type = simpleperf::FindEventTypeByName("arm_spe", false);
+  if (type == nullptr) {
+    GTEST_LOG_(INFO) << "Omit this test since SPE isn't supported on this device";
+    return;
+  }
+  std::vector<int> cpus = type->GetPmuCpumask();
+  if (cpus.empty()) {
+    GTEST_LOG_(INFO) << "Omit this test since SPE cpumask is empty, no supported CPUs";
+    return;
+  }
+  // Just use the first CPU from the CPU list.
+  std::string cpumask = std::format("{:x}", (1 << cpus[0]));
+  TemporaryFile tmpfile;
+  ASSERT_TRUE(RecordCmd()->Run(
+      {"-e", "arm_spe//", "-o", tmpfile.path, "taskset", cpumask, "sleep", SLEEP_SEC}));
+  std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(tmpfile.path);
+  ASSERT_TRUE(reader);
+
+  // ARM SPE uses sample period instead of sample freq.
+  ASSERT_EQ(reader->AttrSection().size(), 1u);
+  const perf_event_attr& attr = reader->AttrSection()[0].attr;
+  ASSERT_EQ(attr.freq, 0);
+  ASSERT_EQ(attr.sample_period, 1024);
+
+  bool has_auxtrace_info = false;
+  bool has_auxtrace = false;
+  bool has_aux = false;
+  ASSERT_TRUE(reader->ReadDataSection([&](std::unique_ptr<Record> r) {
+    if (r->type() == PERF_RECORD_AUXTRACE_INFO) {
+      has_auxtrace_info = true;
+    } else if (r->type() == PERF_RECORD_AUXTRACE) {
+      has_auxtrace = true;
+    } else if (r->type() == PERF_RECORD_AUX) {
+      has_aux = true;
+    }
+    return true;
+  }));
+  ASSERT_TRUE(has_auxtrace_info);
+  ASSERT_TRUE(has_auxtrace);
+  ASSERT_TRUE(has_aux);
+  ASSERT_TRUE(!reader->ReadBuildIdFeature().empty());
 }
 
 // @CddTest = 6.1/C-0-2
