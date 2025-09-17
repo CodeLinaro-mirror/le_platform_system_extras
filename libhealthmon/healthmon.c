@@ -59,8 +59,8 @@ int main(int argc, char *argv[]){
 			printf("Failed to get memory details\n");
 			return -1;
 		}
-		printf("Memory Total : %skB\n", mem_detail.mem_total);
-		printf("Memory Free : %skB\n", mem_detail.mem_free);
+		printf("Memory Total : %s kB\n", mem_detail.mem_total);
+		printf("Memory Free : %s kB\n", mem_detail.mem_free);
 		printf("%s\n", mem_detail.mem_aval);
 		printf("%s\n", mem_detail.mem_cache);
 		printf("Total Apps Usage : %s kB\n", mem_detail.mem_apps_usage);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]){
 		nsize = nand_info();
 		printf("Nand flash size : %llu bytes\n", nsize);
 	} else if(strcmp(argv[1], "log") == 0){
-	        printf("log detail : \n");
+	        printf("log detail : ");
 		char *out = logdetail();
                 if(out == NULL){
 			printf("Failed to get log details\n");
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]){
                         printf("%s", out);
 				free(out);
 	} else if(strcmp(argv[1], "pscount") == 0){
-		printf("process count : \n");
+		printf("process count : ");
 		char *out = pscount();
 		if(out == NULL){
 			printf("Failed to get PS count\n");
@@ -95,22 +95,22 @@ int main(int argc, char *argv[]){
 		}else
 			printf("%.2f%%\n", out);
 	} else if(strcmp(argv[1], "sst") == 0){
-		printf("Device start time : \n");
+		printf("Device start time : ");
 		char *out = starttime();
 		if(out == NULL){
 			perror("failed to get starttime\n");
 			return -1;
 		}else
-			printf("%s", out);
+			printf("%s",out);
 		free(out);
 	} else if(strcmp(argv[1], "osv") == 0){
-		printf("OS version : \n");
+		printf("OS version : ");
 		char *out = osdetail();
 		if(out == NULL){
 			printf("Failed to get OS details\n");
 			return -1;
 		}else
-			printf("%s", out);
+			printf("%s",out);
 		free(out);
 	} else if(strcmp(argv[1], "rlog") == 0){
 		printf("Resetting kernel log : \n");

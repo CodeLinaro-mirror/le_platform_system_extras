@@ -23,11 +23,12 @@ char* memdetail(struct memory *mem_detail) {
 		perror("popen");
 		return NULL;
 		}
-	ret = fread(outbuff, BUFFLEN-1, 1, fp);
+	ret = fread(outbuff,1, BUFFLEN-1, fp);
 	if(ret == -1){
 		perror("fread");
 		return NULL;
 	}
+	outbuff[ret]='\0';
 #if DEBUG
 	printf("%s", outbuff);
 #endif
@@ -42,11 +43,12 @@ char* memdetail(struct memory *mem_detail) {
 		return NULL;
 		}
 
-        ret = fread(outbuff, BUFFLEN-1, 1, fp);
+        ret = fread(outbuff,1, BUFFLEN-1, fp);
         if(ret == -1){
                 perror("fread");
 		return NULL;
 		}
+	outbuff[ret]='\0';
 #if DEBUG
         printf("%s", outbuff);
 #endif
@@ -61,11 +63,12 @@ char* memdetail(struct memory *mem_detail) {
                 perror("popen");
 		return NULL;
 		}
-        ret = fread(outbuff, BUFFLEN-1, 1, fp);
+        ret = fread(outbuff,1, BUFFLEN-1, fp);
         if(ret == -1){
                 perror("fread");
 		return NULL;
 		}
+	outbuff[ret]='\0';
 #if DEBUG
         printf("%s", outbuff);
 #endif
@@ -80,11 +83,12 @@ char* memdetail(struct memory *mem_detail) {
                 perror("popen");
 		return NULL;
 		}
-        ret = fread(outbuff, BUFFLEN-1, 1, fp);
+        ret = fread(outbuff,1, BUFFLEN-1, fp);
         if(ret == -1){
                 perror("fread");
 		return NULL;
 		}
+	outbuff[ret]='\0';
 	char *pos = strstr(outbuff, "SwapCached");
 	len = pos - outbuff;
 	outbuff[len] = '\0';
@@ -102,11 +106,12 @@ char* memdetail(struct memory *mem_detail) {
 		perror("popen");
 		return NULL;
 	}
-	ret = fread(outbuff, BUFFLEN-1, 1, fp);
+	ret = fread(outbuff,1, BUFFLEN-1, fp);
         if(ret == -1){
                 perror("fread");
 		return NULL;
 		}
+	outbuff[ret]='\0';
 #if DEBUG
         printf("%s",outbuff);
 #endif
@@ -120,11 +125,12 @@ char* memdetail(struct memory *mem_detail) {
 		perror("popen");
 		return NULL;
 	}
-	ret = fread(outbuff, BUFFLEN-1, 1, fp);
+	ret = fread(outbuff,1, BUFFLEN-1, fp);
         if(ret == -1){
 		perror("fread");
 		return NULL;
 		}
+	outbuff[ret]='\0';
 #if DEBUG
     printf("%s",outbuff);
 #endif
