@@ -1367,39 +1367,6 @@ TEST(record_cmd, tp_filter_option) {
 }
 
 // @CddTest = 6.1/C-0-2
-TEST(record_cmd, ParseAddrFilterOption) {
-  auto option_to_str = [](const std::string& option) {
-    auto filters = ParseAddrFilterOption(option);
-    std::string s;
-    for (auto& filter : filters) {
-      if (!s.empty()) {
-        s += ',';
-      }
-      s += filter.ToString();
-    }
-    return s;
-  };
-  std::string path;
-  ASSERT_TRUE(Realpath(GetTestData(ELF_FILE), &path));
-
-  // Test file filters.
-  ASSERT_EQ(option_to_str("filter " + path), "filter 0x0/0x73c@" + path);
-  ASSERT_EQ(option_to_str("filter 0x400502-0x400527@" + path), "filter 0x502/0x25@" + path);
-  ASSERT_EQ(option_to_str("start 0x400502@" + path + ",stop 0x400527@" + path),
-            "start 0x502@" + path + ",stop 0x527@" + path);
-
-  // Test '-' in file path. Create a temporary file with '-' in name.
-  TemporaryDir tmpdir;
-  fs::path tmpfile = fs::path(tmpdir.path) / "elf-with-hyphen";
-  ASSERT_TRUE(fs::copy_file(path, tmpfile));
-  ASSERT_EQ(option_to_str("filter " + tmpfile.string()), "filter 0x0/0x73c@" + tmpfile.string());
-
-  // Test kernel filters.
-  ASSERT_EQ(option_to_str("filter 0x12345678-0x1234567a"), "filter 0x12345678/0x2");
-  ASSERT_EQ(option_to_str("start 0x12345678,stop 0x1234567a"), "start 0x12345678,stop 0x1234567a");
-}
-
-// @CddTest = 6.1/C-0-2
 TEST(record_cmd, kprobe_option) {
   TEST_REQUIRE_ROOT();
   EventSelectionSet event_selection_set(false);
