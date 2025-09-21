@@ -54,6 +54,7 @@ _ADB_CMD = "adb"
 _TIMING_THRESHOLD = 5.0
 _CARWATCHDOG_PARSER_CMD = 'perf_stats_parser'
 _LOGIN_END = "LoginEnd"
+_LAUNCHER_SHOWN = "LauncherShown"
 
 max_wait_time = _BOOT_TIME_TOO_BIG
 
@@ -394,6 +395,8 @@ def iterate(args, search_events_pattern, timings_pattern,
     logcat_stop_events.append(_CARWATCHDOG_BOOT_COMPLETE)
   if args.login:
     logcat_stop_events.append(_LOGIN_END)
+  if args.wait_launcher_shown:
+    logcat_stop_events.append(_LAUNCHER_SHOWN)
   logcat_events, logcat_timing_events = collect_events(
       search_events_pattern, f"{_ADB_CMD} logcat -b all -v epoch",
       timings_pattern, logcat_stop_events, True, False)
@@ -526,6 +529,14 @@ def iterate(args, search_events_pattern, timings_pattern,
       "from_dmesg": False,
       "logcat_value": 0.0
     }
+  if events.get("LauncherShown") and boottime_events.get("bootloader"):
+    total = events["LauncherShown"] + boottime_events["bootloader"]
+    data_points["*LauncherShown+Bootloader"] = {
+      "value": total,
+      "from_dmesg": False,
+      "logcat_value": 0.0
+    }
+
   for k, v in data_points.items():
     print("{0:30}: {1:<7.5} {2:1} ({3})".format(
       k, v["value"], "*" if v["from_dmesg"] else "", v["logcat_value"]))
@@ -700,6 +711,11 @@ def init_arguments():
                       action="store_true",
                       help=("if login workflow is enabled, skip the OOBE and "
                             "credential setup"))
+  parser.add_argument("--wait-launcher-shown",
+                      dest="wait_launcher_shown",
+                      action="store_true",
+                      help=("wait until launcher is shown and also collect"
+                            "launcher shown event"))
   return parser.parse_args()
 
 
