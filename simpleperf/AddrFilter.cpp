@@ -24,7 +24,9 @@
 #include <string>
 #include <vector>
 
+#include "read_apk.h"
 #include "read_elf.h"
+#include "utils.h"
 
 namespace simpleperf {
 
@@ -49,6 +51,65 @@ static bool ConsumeAddr(const char*& p, uint64_t* addr) {
   return false;
 }
 
+// Convert addresses used in addr filter to file offsets, and do some check.
+static bool ConvertFileAddrsToOffsets(std::string& path, uint64_t& begin_offset,
+                                      uint64_t& end_offset, std::vector<uint64_t>& addrs) {
+  ElfStatus status;
+
+  auto tuple = SplitUrlInApk(path);
+  if (!std::get<0>(tuple)) {
+    std::string s;
+    if (!android::base::Realpath(path, &s)) {
+      return false;
+    }
+    path = s;
+    uint64_t file_size = GetFileSize(path);
+    begin_offset = 0;
+    end_offset = file_size;
+    // Case 1: It's a normal ELF file. Convert addrs to file offsets.
+    ElfStatus status;
+    if (auto elf = ElfFile::Open(path, &status); elf) {
+      for (uint64_t& addr : addrs) {
+        uint64_t off;
+        if (!elf->VaddrToOff(addr, &off)) {
+          return false;
+        }
+        addr = off;
+      }
+      return true;
+    }
+    // Case 2: It's an apk file. Check addrs <= file size.
+    for (uint64_t addr : addrs) {
+      if (addr > file_size) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Case 3: It's an ELF binary embedded in an apk file.
+  EmbeddedElf* embedded_elf =
+      ApkInspector::FindElfInApkByName(std::get<1>(tuple), std::get<2>(tuple));
+  if (embedded_elf != nullptr) {
+    begin_offset = embedded_elf->entry_offset();
+    end_offset = begin_offset + embedded_elf->entry_size();
+    if (auto elf = ElfFile::Open(path, &status); elf) {
+      for (uint64_t& addr : addrs) {
+        uint64_t off;
+        if (!elf->VaddrToOff(addr, &off)) {
+          return false;
+        }
+        addr = begin_offset + off;
+      }
+      if (!android::base::Realpath(std::get<1>(tuple), &path)) {
+        return false;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 // To reduce function length, not all format errors are checked.
 static bool ParseOneAddrFilter(const std::string& s, std::vector<AddrFilter>* filters) {
   std::vector<std::string> args = android::base::Split(s, " ");
@@ -56,68 +117,68 @@ static bool ParseOneAddrFilter(const std::string& s, std::vector<AddrFilter>* fi
     return false;
   }
 
-  uint64_t addr1;
-  uint64_t addr2;
-  uint64_t off1;
-  uint64_t off2;
   std::string path;
+  uint64_t begin_offset = 0;
+  uint64_t end_offset = 0;
+  std::vector<uint64_t> addrs(2, 0);
 
-  if (auto p = s.data(); ConsumeStr(p, "start") && ConsumeAddr(p, &addr1)) {
+  if (auto p = s.data(); ConsumeStr(p, "start") && ConsumeAddr(p, &addrs[0])) {
     if (*p == '\0') {
       // start <kernel_addr>
-      filters->emplace_back(AddrFilter::KERNEL_START, addr1, 0, "");
+      filters->emplace_back(AddrFilter::KERNEL_START, addrs[0], 0, "");
       return true;
     }
     if (ConsumeStr(p, "@") && *p != '\0') {
-      // start <vaddr>@<file_path>
-      if (auto elf = ElfFile::Open(p);
-          elf && elf->VaddrToOff(addr1, &off1) && android::base::Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_START, off1, 0, path);
+      // start <vaddr>@<binary_path> or <offset>@<apk_path>
+      path = p;
+      addrs.resize(1);
+      if (ConvertFileAddrsToOffsets(path, begin_offset, end_offset, addrs)) {
+        filters->emplace_back(AddrFilter::FILE_START, addrs[0], 0, path);
         return true;
       }
     }
   }
-  if (auto p = s.data(); ConsumeStr(p, "stop") && ConsumeAddr(p, &addr1)) {
+  if (auto p = s.data(); ConsumeStr(p, "stop") && ConsumeAddr(p, &addrs[0])) {
     if (*p == '\0') {
       // stop <kernel_addr>
-      filters->emplace_back(AddrFilter::KERNEL_STOP, addr1, 0, "");
+      filters->emplace_back(AddrFilter::KERNEL_STOP, addrs[0], 0, "");
       return true;
     }
     if (ConsumeStr(p, "@") && *p != '\0') {
-      // stop <vaddr>@<file_path>
-      if (auto elf = ElfFile::Open(p);
-          elf && elf->VaddrToOff(addr1, &off1) && android::base::Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_STOP, off1, 0, path);
+      // stop <vaddr>@<binary_path> or <offset>@<apk_path>
+      path = p;
+      addrs.resize(1);
+      if (ConvertFileAddrsToOffsets(path, begin_offset, end_offset, addrs)) {
+        filters->emplace_back(AddrFilter::FILE_STOP, addrs[0], 0, path);
         return true;
       }
     }
   }
-  if (auto p = s.data(); ConsumeStr(p, "filter") && ConsumeAddr(p, &addr1) && ConsumeStr(p, "-") &&
-                         ConsumeAddr(p, &addr2)) {
+  if (auto p = s.data(); ConsumeStr(p, "filter") && ConsumeAddr(p, &addrs[0]) &&
+                         ConsumeStr(p, "-") && ConsumeAddr(p, &addrs[1]) && addrs[1] > addrs[0]) {
     if (*p == '\0') {
       // filter <kernel_addr_start>-<kernel_addr_end>
-      filters->emplace_back(AddrFilter::KERNEL_RANGE, addr1, addr2 - addr1, "");
+      filters->emplace_back(AddrFilter::KERNEL_RANGE, addrs[0], addrs[1] - addrs[0], "");
       return true;
     }
     if (ConsumeStr(p, "@") && *p != '\0') {
-      // filter <vaddr_start>-<vaddr_end>@<file_path>
-      if (auto elf = ElfFile::Open(p); elf && elf->VaddrToOff(addr1, &off1) &&
-                                       elf->VaddrToOff(addr2, &off2) &&
-                                       android::base::Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_RANGE, off1, off2 - off1, path);
+      // filter <vaddr_start>-<vaddr_end>@<binary_path> or <offset_start>-<offset_end>@<apk_path>
+      path = p;
+      if (ConvertFileAddrsToOffsets(path, begin_offset, end_offset, addrs)) {
+        filters->emplace_back(AddrFilter::FILE_RANGE, addrs[0], addrs[1] - addrs[0], path);
         return true;
       }
     }
   }
   if (auto p = s.data(); ConsumeStr(p, "filter") && *p != '\0') {
     // filter <file_path>
-    path = android::base::Trim(p);
-    if (auto elf = ElfFile::Open(path); elf) {
-      for (const ElfSegment& seg : elf->GetProgramHeader()) {
-        if (seg.is_executable) {
-          filters->emplace_back(AddrFilter::FILE_RANGE, seg.file_offset, seg.file_size, path);
-        }
-      }
+    while (isspace(*p) && *p != '\0') {
+      p++;
+    }
+    path = p;
+    addrs.clear();
+    if (ConvertFileAddrsToOffsets(path, begin_offset, end_offset, addrs)) {
+      filters->emplace_back(AddrFilter::FILE_RANGE, begin_offset, end_offset - begin_offset, path);
       return true;
     }
   }
