@@ -265,6 +265,7 @@ cc_defaults {
         },
         linux: {
             srcs: [
+                "AddrFilter.cpp",
                 "CallChainJoiner.cpp",
                 "cmd_api.cpp",
                 "cmd_debug_unwind.cpp",
@@ -613,6 +614,7 @@ cc_defaults {
                 "cmd_record_test.cpp",
             ],
             srcs: [
+                "AddrFilter_test.cpp",
                 "CallChainJoiner_test.cpp",
                 "cmd_api_test.cpp",
                 "cmd_debug_unwind_test.cpp",
