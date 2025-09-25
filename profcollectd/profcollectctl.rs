@@ -19,7 +19,7 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use flags_rust::GetServerConfigurableFlag;
-use rustutils::system_properties;
+use rustutils::android::system_properties;
 
 #[derive(Parser)]
 #[command(about = "Command interface for profcollectd", long_about = None)]
