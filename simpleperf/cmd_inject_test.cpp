@@ -209,7 +209,7 @@ TEST(cmd_inject, merge_branch_list_files) {
 
 // @CddTest = 6.1/C-0-2
 TEST(cmd_inject, report_warning_when_overflow) {
-  CapturedStderr capture;
+  android::base::CapturedStderr capture;
   std::vector<std::unique_ptr<TemporaryFile>> branch_list_files;
   std::vector<std::unique_ptr<TemporaryFile>> input_files;
 
@@ -376,7 +376,7 @@ TEST(cmd_inject, check_missing_aux_data) {
   // Inject a malformed perf.data where an aux record's offset was changed to
   // point outside the file. It should report warnings and generate an empty file.
   android::base::ScopedLogSeverity severity(android::base::INFO);
-  CapturedStderr capture;
+  android::base::CapturedStderr capture;
   TemporaryFile tmpfile;
   close(tmpfile.release());
   ASSERT_TRUE(RunInjectCmd({"-i", GetTestData("etm/perf_etm_wrong_aux.data"), "-o", tmpfile.path}));

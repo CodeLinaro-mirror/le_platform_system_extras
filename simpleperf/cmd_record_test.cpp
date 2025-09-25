@@ -1462,7 +1462,7 @@ TEST(record_cmd, kernel_address_warning) {
   TEST_REQUIRE_KERNEL_EVENTS();
   TEST_REQUIRE_NON_ROOT();
   const std::string warning_msg = "Access to kernel symbol addresses is restricted.";
-  CapturedStderr capture;
+  android::base::CapturedStderr capture;
 
   // When excluding kernel samples, no kernel address warning is printed.
   ResetKernelAddressWarning();
