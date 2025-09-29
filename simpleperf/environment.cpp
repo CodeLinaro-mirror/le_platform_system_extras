@@ -501,23 +501,27 @@ static bool HasOpenedAppApkFile(int pid) {
   return false;
 }
 
+std::string GetAppPackageNameForPid(pid_t pid, const std::string& proc_dir) {
+  std::string process_name = GetCompleteProcessName(pid, proc_dir);
+  if (!process_name.empty()) {
+    // The app may have multiple processes, with process name like
+    // com.google.android.googlequicksearchbox:search.
+    size_t split_pos = process_name.find(':');
+    if (split_pos != std::string::npos) {
+      return process_name.substr(0, split_pos);
+    }
+    return process_name;
+  }
+  return "";
+}
+
 std::set<pid_t> WaitForAppProcesses(const std::string& package_name) {
   std::set<pid_t> result;
   size_t loop_count = 0;
   while (true) {
     std::vector<pid_t> pids = GetAllProcesses();
     for (pid_t pid : pids) {
-      std::string process_name = GetCompleteProcessName(pid);
-      if (process_name.empty()) {
-        continue;
-      }
-      // The app may have multiple processes, with process name like
-      // com.google.android.googlequicksearchbox:search.
-      size_t split_pos = process_name.find(':');
-      if (split_pos != std::string::npos) {
-        process_name = process_name.substr(0, split_pos);
-      }
-      if (process_name != package_name) {
+      if (GetAppPackageNameForPid(pid) != package_name) {
         continue;
       }
       // If a debuggable app with wrap.sh runs on Android O, the app will be started with
@@ -979,9 +983,9 @@ bool MappedFileOnlyExistInMemory(const char* filename) {
          strncmp(filename, "/memfd:", 7) == 0;
 }
 
-std::string GetCompleteProcessName(pid_t pid) {
+std::string GetCompleteProcessName(pid_t pid, const std::string& proc_dir) {
   std::string argv0;
-  if (!android::base::ReadFileToString("/proc/" + std::to_string(pid) + "/cmdline", &argv0)) {
+  if (!android::base::ReadFileToString(proc_dir + "/" + std::to_string(pid) + "/cmdline", &argv0)) {
     // Maybe we don't have permission to read it.
     return std::string();
   }

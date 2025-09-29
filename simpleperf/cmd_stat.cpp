@@ -361,10 +361,12 @@ class NewThreadMonitor {
 
  public:
   NewThreadMonitor(EventSelectionSet& event_selection_set, bool monitor_all_processes,
+                   const std::optional<std::string>& monitored_app_package,
                    const std::set<pid_t>& monitored_processes,
                    std::unordered_map<pid_t, ThreadInfo>& threads)
       : event_selection_set_(event_selection_set),
         monitor_all_processes_(monitor_all_processes),
+        monitored_app_package_(monitored_app_package),
         monitored_processes_(monitored_processes),
         threads_(threads) {}
 
@@ -393,6 +395,14 @@ class NewThreadMonitor {
         }
       }
     } else {
+      if (monitored_app_package_) {
+        for (int pid : GetAllProcesses()) {
+          if (GetAppPackageNameForPid(pid) == monitored_app_package_.value() &&
+              monitored_processes_.count(pid) == 0) {
+            monitored_processes_.insert(pid);
+          }
+        }
+      }
       for (auto pid : monitored_processes_) {
         for (auto tid : GetThreadsInProcess(pid)) {
           if (threads_.count(tid) == 0) {
@@ -425,6 +435,7 @@ class NewThreadMonitor {
  private:
   EventSelectionSet& event_selection_set_;
   bool monitor_all_processes_ = false;
+  std::optional<std::string> monitored_app_package_;
   std::set<pid_t> monitored_processes_;
   std::unordered_map<pid_t, ThreadInfo>& threads_;
 };
@@ -628,6 +639,7 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
     }
   }
   bool need_to_check_targets = false;
+  bool monitor_app_package = false;
   if (system_wide_collection_) {
     if (report_per_thread_) {
       event_selection_set_.AddMonitoredProcesses(GetAllProcesses());
@@ -641,6 +653,7 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
     } else if (!app_package_name_.empty()) {
       std::set<pid_t> pids = WaitForAppProcesses(app_package_name_);
       event_selection_set_.AddMonitoredProcesses(pids);
+      monitor_app_package = true;
     } else {
       LOG(ERROR) << "No threads to monitor. Try `simpleperf help stat` for help\n";
       return false;
@@ -656,9 +669,13 @@ bool StatCommand::Run(const std::vector<std::string>& args) {
   }
   std::unique_ptr<NewThreadMonitor> new_thread_monitor;
   if (monitor_new_thread_) {
-    new_thread_monitor.reset(new NewThreadMonitor(event_selection_set_, system_wide_collection_,
-                                                  event_selection_set_.GetMonitoredProcesses(),
-                                                  thread_info_));
+    std::optional<std::string> monitored_app;
+    if (monitor_app_package) {
+      monitored_app = app_package_name_;
+    }
+    new_thread_monitor = std::make_unique<NewThreadMonitor>(
+        event_selection_set_, system_wide_collection_, monitored_app,
+        event_selection_set_.GetMonitoredProcesses(), thread_info_);
   }
   if (report_per_thread_) {
     MonitorEachThread();
