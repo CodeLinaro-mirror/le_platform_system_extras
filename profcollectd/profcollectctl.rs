@@ -19,7 +19,7 @@
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use flags_rust::GetServerConfigurableFlag;
-use rustutils::system_properties;
+use rustutils::android::system_properties;
 
 #[derive(Parser)]
 #[command(about = "Command interface for profcollectd", long_about = None)]
@@ -40,6 +40,8 @@ enum Commands {
     Reset,
     /// Set property for profcollectd.
     SetProperty,
+    /// Dump property configurations for profcollectd.
+    DumpProperty,
 }
 
 #[derive(Args)]
@@ -87,6 +89,14 @@ fn main() -> Result<()> {
             if old_value != new_value {
                 system_properties::write("persist.profcollectd.enabled", new_value)?;
             }
+        }
+        Commands::DumpProperty => {
+            let curr_value =
+                system_properties::read("persist.profcollectd.enabled")?.unwrap_or("".to_string());
+            let config_value =
+                GetServerConfigurableFlag("profcollect_native_boot", "enabled", "false");
+            println!("persist.profcollectd.enabled={}", curr_value);
+            println!("Device config profcollect_native_boot.enabled={}", config_value);
         }
     }
     Ok(())
