@@ -301,16 +301,18 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
 "--addr-filter filter_str1,filter_str2,...\n"
 "                Provide address filters for cs-etm instruction tracing.\n"
 "                filter_str accepts below formats:\n"
-"                  'filter  <addr-range>'  -- trace instructions in a range\n"
+"                  'filter <addr-range>'   -- trace instructions in a range\n"
 "                  'start <addr>'          -- start tracing when ip is <addr>\n"
 "                  'stop <addr>'           -- stop tracing when ip is <addr>\n"
 "                <addr-range> accepts below formats:\n"
-"                  <file_path>                            -- code sections in a binary file\n"
-"                  <vaddr_start>-<vaddr_end>@<file_path>  -- part of a binary file\n"
-"                  <kernel_addr_start>-<kernel_addr_end>  -- part of kernel space\n"
+"                  <file_path>                             -- the whole binary or apk file\n"
+"                  <vaddr_start>-<vaddr_end>@<binary_path> -- part of a binary file\n"
+"                  <offset_start>-<offset_end>@<apk_path>  -- part of an apk file\n"
+"                  <kernel_addr_start>-<kernel_addr_end>   -- part of kernel space\n"
 "                <addr> accepts below formats:\n"
-"                  <vaddr>@<file_path>      -- virtual addr in a binary file\n"
-"                  <kernel_addr>            -- a kernel address\n"
+"                  <vaddr>@<binary_path>   -- virtual addr in a binary file\n"
+"                  <offset>@<apk_path>     -- file offset in an apk file\n"
+"                  <kernel_addr>           -- a kernel address\n"
 "                Examples:\n"
 "                  'filter 0x456-0x480@/system/lib/libc.so'\n"
 "                  'start 0x456@/system/lib/libc.so,stop 0x480@/system/lib/libc.so'\n"
@@ -2325,108 +2327,6 @@ bool RecordCommand::DumpInitMapFeature() {
 }
 
 }  // namespace
-
-static bool ConsumeStr(const char*& p, const char* s) {
-  if (strncmp(p, s, strlen(s)) == 0) {
-    p += strlen(s);
-    return true;
-  }
-  return false;
-}
-
-static bool ConsumeAddr(const char*& p, uint64_t* addr) {
-  errno = 0;
-  char* end;
-  *addr = strtoull(p, &end, 0);
-  if (errno == 0 && p != end) {
-    p = end;
-    return true;
-  }
-  return false;
-}
-
-// To reduce function length, not all format errors are checked.
-static bool ParseOneAddrFilter(const std::string& s, std::vector<AddrFilter>* filters) {
-  std::vector<std::string> args = android::base::Split(s, " ");
-  if (args.size() != 2) {
-    return false;
-  }
-
-  uint64_t addr1;
-  uint64_t addr2;
-  uint64_t off1;
-  uint64_t off2;
-  std::string path;
-
-  if (auto p = s.data(); ConsumeStr(p, "start") && ConsumeAddr(p, &addr1)) {
-    if (*p == '\0') {
-      // start <kernel_addr>
-      filters->emplace_back(AddrFilter::KERNEL_START, addr1, 0, "");
-      return true;
-    }
-    if (ConsumeStr(p, "@") && *p != '\0') {
-      // start <vaddr>@<file_path>
-      if (auto elf = ElfFile::Open(p); elf && elf->VaddrToOff(addr1, &off1) && Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_START, off1, 0, path);
-        return true;
-      }
-    }
-  }
-  if (auto p = s.data(); ConsumeStr(p, "stop") && ConsumeAddr(p, &addr1)) {
-    if (*p == '\0') {
-      // stop <kernel_addr>
-      filters->emplace_back(AddrFilter::KERNEL_STOP, addr1, 0, "");
-      return true;
-    }
-    if (ConsumeStr(p, "@") && *p != '\0') {
-      // stop <vaddr>@<file_path>
-      if (auto elf = ElfFile::Open(p); elf && elf->VaddrToOff(addr1, &off1) && Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_STOP, off1, 0, path);
-        return true;
-      }
-    }
-  }
-  if (auto p = s.data(); ConsumeStr(p, "filter") && ConsumeAddr(p, &addr1) && ConsumeStr(p, "-") &&
-                         ConsumeAddr(p, &addr2)) {
-    if (*p == '\0') {
-      // filter <kernel_addr_start>-<kernel_addr_end>
-      filters->emplace_back(AddrFilter::KERNEL_RANGE, addr1, addr2 - addr1, "");
-      return true;
-    }
-    if (ConsumeStr(p, "@") && *p != '\0') {
-      // filter <vaddr_start>-<vaddr_end>@<file_path>
-      if (auto elf = ElfFile::Open(p); elf && elf->VaddrToOff(addr1, &off1) &&
-                                       elf->VaddrToOff(addr2, &off2) && Realpath(p, &path)) {
-        filters->emplace_back(AddrFilter::FILE_RANGE, off1, off2 - off1, path);
-        return true;
-      }
-    }
-  }
-  if (auto p = s.data(); ConsumeStr(p, "filter") && *p != '\0') {
-    // filter <file_path>
-    path = android::base::Trim(p);
-    if (auto elf = ElfFile::Open(path); elf) {
-      for (const ElfSegment& seg : elf->GetProgramHeader()) {
-        if (seg.is_executable) {
-          filters->emplace_back(AddrFilter::FILE_RANGE, seg.file_offset, seg.file_size, path);
-        }
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
-std::vector<AddrFilter> ParseAddrFilterOption(const std::string& s) {
-  std::vector<AddrFilter> filters;
-  for (const auto& str : android::base::Split(s, ",")) {
-    if (!ParseOneAddrFilter(str, &filters)) {
-      LOG(ERROR) << "failed to parse addr filter: " << str;
-      return {};
-    }
-  }
-  return filters;
-}
 
 void RegisterRecordCommand() {
   RegisterCommand("record", [] { return std::unique_ptr<Command>(new RecordCommand()); });
