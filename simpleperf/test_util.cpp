@@ -118,7 +118,7 @@ static bool HasNonZeroInstructionEventCount() {
 }
 
 bool IsInEmulator() {
-  std::string fingerprint = android::base::GetProperty("ro.system.build.fingerprint", "");
+  std::string fingerprint = android::base::GetProperty("ro.build.fingerprint", "");
   return android::base::StartsWith(fingerprint, "google/sdk_gphone") ||
          android::base::StartsWith(fingerprint, "google/sdk_gpc") ||
          android::base::StartsWith(fingerprint, "generic/cf") ||

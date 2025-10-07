@@ -157,6 +157,10 @@ cc_defaults {
         },
         windows: {
             enabled: true,
+            host_ldlibs: [
+                // Required by stack tracing code bundled with protobuf
+                "-ldbghelp",
+            ],
         },
     },
     use_version_lib: true,
@@ -421,6 +425,9 @@ cc_binary {
             dist: {
                 dir: "simpleperf/darwin/x86",
             },
+            host_ldlibs: [
+                "-framework CoreFoundation",
+            ],
         },
         darwin_x86_64: {
             dist: {
@@ -518,6 +525,9 @@ cc_library_shared {
             dist: {
                 dir: "simpleperf/darwin/x86",
             },
+            host_ldlibs: [
+                "-framework CoreFoundation",
+            ],
         },
         darwin_x86_64: {
             dist: {

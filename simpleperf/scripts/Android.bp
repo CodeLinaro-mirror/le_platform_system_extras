@@ -37,3 +37,17 @@ python_library_host {
         "bin/windows/**/*.dll",
     ],
 }
+
+python_library_host {
+    name: "profile_py_pb2",
+    srcs: [
+        "profile_pb2.py",
+    ],
+    libs: [
+        "libprotobuf-python",
+    ],
+    proto: {
+        include_dirs: ["external/protobuf/src"],
+        canonical_path_from_root: false,
+    },
+}

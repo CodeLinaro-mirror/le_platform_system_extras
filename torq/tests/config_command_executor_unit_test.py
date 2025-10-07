@@ -19,10 +19,11 @@ import subprocess
 import sys
 import io
 from unittest import mock
-from src.command import ConfigCommand
+from src.base import ValidationError
+from src.config import ConfigCommand, execute_config_command, PREDEFINED_PERFETTO_CONFIGS
 from src.device import AdbDevice
-from src.validation_error import ValidationError
-from src.torq import DEFAULT_DUR_MS, PREDEFINED_PERFETTO_CONFIGS
+from src.profiler import DEFAULT_DUR_MS
+from tests.test_utils import parse_cli
 
 TEST_ERROR_MSG = "test-error"
 TEST_VALIDATION_ERROR = ValidationError(TEST_ERROR_MSG, None)
@@ -43,7 +44,6 @@ buffers: {{
   size_kb: 260096
   fill_policy: RING_BUFFER
 }}
-
 data_sources: {{
   config {{
     name: "linux.process_stats"
@@ -52,21 +52,19 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.log"
     android_log_config {{
+      min_prio: PRIO_VERBOSE
     }}
   }}
 }}
-
 data_sources {{
   config {{
     name: "android.packages_list"
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.sys_stats"
@@ -105,14 +103,12 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.surfaceflinger.frametimeline"
     target_buffer: 2
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.ftrace"
@@ -186,7 +182,6 @@ data_sources {{
   producer_name_filter: "perfetto.traced_probes"
 }}
 
-duration_ms: 10000
 write_into_file: true
 file_write_period_ms: 5000
 max_file_size_bytes: 100000000000
@@ -209,7 +204,6 @@ buffers: {{
   size_kb: 260096
   fill_policy: RING_BUFFER
 }}
-
 data_sources: {{
   config {{
     name: "linux.process_stats"
@@ -218,21 +212,19 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.log"
     android_log_config {{
+      min_prio: PRIO_VERBOSE
     }}
   }}
 }}
-
 data_sources {{
   config {{
     name: "android.packages_list"
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.sys_stats"
@@ -271,14 +263,12 @@ data_sources: {{
     }}
   }}
 }}
-
 data_sources: {{
   config {{
     name: "android.surfaceflinger.frametimeline"
     target_buffer: 2
   }}
 }}
-
 data_sources: {{
   config {{
     name: "linux.ftrace"
@@ -352,7 +342,6 @@ data_sources {{
   producer_name_filter: "perfetto.traced_probes"
 }}
 
-duration_ms: 10000
 write_into_file: true
 file_write_period_ms: 5000
 max_file_size_bytes: 100000000000
@@ -366,35 +355,39 @@ incremental_state_config {{
 class ConfigCommandExecutorUnitTest(unittest.TestCase):
 
   def setUp(self):
-    self.mock_device = mock.create_autospec(AdbDevice, instance=True,
-                                            serial=TEST_SERIAL)
+    self.maxDiff = None
+    self.mock_device = mock.create_autospec(
+        AdbDevice, instance=True, serial=TEST_SERIAL)
     self.mock_device.check_device_connection.return_value = None
     self.mock_device.get_android_sdk_version.return_value = (
         ANDROID_SDK_VERSION_T)
 
   @staticmethod
   def generate_mock_completed_process(stdout_string=b'\n', stderr_string=b'\n'):
-    return mock.create_autospec(subprocess.CompletedProcess, instance=True,
-                                stdout=stdout_string, stderr=stderr_string)
+    return mock.create_autospec(
+        subprocess.CompletedProcess,
+        instance=True,
+        stdout=stdout_string,
+        stderr=stderr_string)
 
   def test_config_list(self):
     terminal_output = io.StringIO()
     sys.stdout = terminal_output
 
-    self.command = ConfigCommand("config list", None, None, None, None, None)
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config list")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
-    self.assertEqual(terminal_output.getvalue(), (
-        "%s\n" % "\n".join(list(PREDEFINED_PERFETTO_CONFIGS.keys()))))
+    self.assertEqual(
+        terminal_output.getvalue(),
+        ("%s\n" % "\n".join(list(PREDEFINED_PERFETTO_CONFIGS.keys()))))
 
   def test_config_show(self):
     terminal_output = io.StringIO()
     sys.stdout = terminal_output
 
-    self.command = ConfigCommand("config show", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config show default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
     self.assertEqual(terminal_output.getvalue(), TEST_DEFAULT_CONFIG)
@@ -402,12 +395,12 @@ class ConfigCommandExecutorUnitTest(unittest.TestCase):
   def test_config_show_no_device_connection(self):
     self.mock_device.check_device_connection.return_value = (
         TEST_VALIDATION_ERROR)
+
     terminal_output = io.StringIO()
     sys.stdout = terminal_output
 
-    self.command = ConfigCommand("config show", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config show default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
     self.assertEqual(terminal_output.getvalue(), TEST_DEFAULT_CONFIG)
@@ -418,9 +411,8 @@ class ConfigCommandExecutorUnitTest(unittest.TestCase):
     terminal_output = io.StringIO()
     sys.stdout = terminal_output
 
-    self.command = ConfigCommand("config show", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config show default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
     self.assertEqual(terminal_output.getvalue(),
@@ -429,10 +421,9 @@ class ConfigCommandExecutorUnitTest(unittest.TestCase):
   @mock.patch.object(subprocess, "run", autospec=True)
   def test_config_pull(self, mock_subprocess_run):
     mock_subprocess_run.return_value = self.generate_mock_completed_process()
-    self.command = ConfigCommand("config pull", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
 
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config pull default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
 
@@ -441,10 +432,9 @@ class ConfigCommandExecutorUnitTest(unittest.TestCase):
     self.mock_device.check_device_connection.return_value = (
         TEST_VALIDATION_ERROR)
     mock_subprocess_run.return_value = self.generate_mock_completed_process()
-    self.command = ConfigCommand("config pull", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
 
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config pull default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
 
@@ -453,10 +443,9 @@ class ConfigCommandExecutorUnitTest(unittest.TestCase):
     self.mock_device.get_android_sdk_version.return_value = (
         ANDROID_SDK_VERSION_S)
     mock_subprocess_run.return_value = self.generate_mock_completed_process()
-    self.command = ConfigCommand("config pull", "default", None, DEFAULT_DUR_MS,
-                                 None, None)
 
-    error = self.command.execute(self.mock_device)
+    args = parse_cli("torq config pull default")
+    error = execute_config_command(args, self.mock_device)
 
     self.assertEqual(error, None)
 

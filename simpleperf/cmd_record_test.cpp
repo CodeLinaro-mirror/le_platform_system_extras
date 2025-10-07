@@ -919,6 +919,8 @@ TEST(record_cmd, app_option_for_profileable_app) {
 
 #if defined(__ANDROID__)
 static void RecordJavaApp(RecordingAppHelper& helper) {
+  // The source code is in
+  // https://github.com/yabinc/simpleperf_demo/tree/master/test_apps/android-DisplayingBitmaps.
   // 1. Install apk.
   ASSERT_TRUE(helper.InstallApk(GetTestData("DisplayBitmaps.apk"),
                                 "com.example.android.displayingbitmaps"));
@@ -928,13 +930,12 @@ static void RecordJavaApp(RecordingAppHelper& helper) {
   // 2. Start the app.
   ASSERT_TRUE(
       helper.StartApp("am instrument -w -r -e debug false -e class "
-                      "com.example.android.displayingbitmaps.tests.GridViewTest "
+                      "com.example.android.displayingbitmaps.tests.GridViewFastTest "
                       "com.example.android.displayingbitmaps.test/"
                       "androidx.test.runner.AndroidJUnitRunner"));
 
   // 3. Record perf.data.
-  ASSERT_TRUE(helper.RecordData(
-      "-e cpu-clock --app com.example.android.displayingbitmaps -g --duration 15"));
+  ASSERT_TRUE(helper.RecordData("-e cpu-clock --app com.example.android.displayingbitmaps -g"));
 }
 #endif  // defined(__ANDROID__)
 
