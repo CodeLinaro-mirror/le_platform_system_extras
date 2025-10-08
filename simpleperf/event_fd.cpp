@@ -189,8 +189,7 @@ bool EventFd::ShareMappedBuffer(const EventFd& event_fd, bool report_error) {
   int result = ioctl(perf_event_fd_, PERF_EVENT_IOC_SET_OUTPUT, event_fd.perf_event_fd_);
   if (result != 0) {
     if (report_error) {
-      PLOG(ERROR) << "failed to share mapped buffer of " << event_fd.perf_event_fd_ << " with "
-                  << perf_event_fd_;
+      PLOG(ERROR) << "failed to share mapped buffer of " << event_fd.Name() << " with " << Name();
     }
     return false;
   }

@@ -206,7 +206,7 @@ class RecordReadThread {
   void IncreaseThreadPriority();
   Cmd GetCmd();
   bool HandleCmd(IOEventLoop& loop);
-  bool HandleAddEventFds(IOEventLoop& loop, const std::vector<EventFd*>& event_fds);
+  bool HandleAddEventFds(IOEventLoop& loop, std::vector<EventFd*>& event_fds);
   bool HandleRemoveEventFds(const std::vector<EventFd*>& event_fds);
   bool ReadRecordsFromKernelBuffer();
   void PushRecordToRecordBuffer(KernelRecordReader* kernel_record_reader);

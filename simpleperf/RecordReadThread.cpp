@@ -416,9 +416,17 @@ bool RecordReadThread::HandleCmd(IOEventLoop& loop) {
   return true;
 }
 
-bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop,
-                                         const std::vector<EventFd*>& event_fds) {
+bool RecordReadThread::HandleAddEventFds(IOEventLoop& loop, std::vector<EventFd*>& event_fds) {
   std::unordered_map<int, EventFd*> cpu_map;
+  // Buffers are created only for the first event on every CPU, and since AuxBuffers are not shared,
+  // the ones that require AuxBuffer need to come first.
+  // Sort the events to fulfill this requirement.
+  auto comp = [](const EventFd* fd1, const EventFd* fd2) {
+    bool fd1_needs_aux = IsEtmEventName(fd1->EventName()) || IsSpeEventName(fd1->EventName());
+    bool fd2_needs_aux = IsEtmEventName(fd2->EventName()) || IsSpeEventName(fd2->EventName());
+    return (fd1_needs_aux && !fd2_needs_aux);
+  };
+  std::sort(event_fds.begin(), event_fds.end(), comp);
   for (size_t pages = max_mmap_pages_; pages >= min_mmap_pages_; pages >>= 1) {
     bool success = true;
     bool report_error = pages == min_mmap_pages_;
