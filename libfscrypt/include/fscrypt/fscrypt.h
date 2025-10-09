@@ -32,6 +32,7 @@ namespace fscrypt {
 enum class KeyType {
     kRaw,
     kHwWrappedV0,
+    kHwWrapped,
 };
 
 struct EncryptionOptions {
