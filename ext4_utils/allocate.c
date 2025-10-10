@@ -53,7 +53,7 @@ struct xattr_list_element {
 	struct xattr_list_element *next;
 };
 
-struct block_allocation *create_allocation()
+struct block_allocation *create_allocation(void)
 {
 	struct block_allocation *alloc = malloc(sizeof(struct block_allocation));
 	alloc->list.first = NULL;
@@ -319,7 +319,7 @@ static void init_bg(struct block_group_info *bg, unsigned int i)
 	}
 }
 
-void block_allocator_init()
+void block_allocator_init(void)
 {
 	unsigned int i;
 
@@ -331,7 +331,7 @@ void block_allocator_init()
 		init_bg(&aux_info.bgs[i], i);
 }
 
-void block_allocator_free()
+void block_allocator_free(void)
 {
 	unsigned int i;
 
@@ -360,7 +360,7 @@ static u32 ext4_allocate_blocks_from_block_group(u32 len, int bg_num)
 }
 
 /* Allocate a single block and return its block number */
-u32 allocate_block()
+u32 allocate_block(void)
 {
 	unsigned int i;
 	for (i = 0; i < aux_info.groups; i++) {
@@ -720,7 +720,7 @@ u32 reserve_inodes(int bg, u32 num)
 
 /* Returns the first free inode number
    TODO: Inodes should be allocated in the block group of the data? */
-u32 allocate_inode()
+u32 allocate_inode(void)
 {
 	unsigned int bg;
 	u32 inode;

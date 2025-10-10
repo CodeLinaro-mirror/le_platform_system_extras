@@ -256,8 +256,12 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 	if (needs_lost_and_found) {
 		/* insert a lost+found directory at the beginning of the dentries */
 		struct dentry *tmp = calloc(entries + 1, sizeof(struct dentry));
-		memset(tmp, 0, sizeof(struct dentry));
-		memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
+		if (tmp == NULL)
+		    critical_error_errno("calloc");
+
+		memset(tmp, 0, (entries + 1) * sizeof(struct dentry));
+		if (entries != 0)
+		    memcpy(tmp + 1, dentries, entries * sizeof(struct dentry));
 		dentries = tmp;
 
 		dentries[0].filename = strdup("lost+found");
@@ -338,12 +342,12 @@ static u32 build_directory_structure(const char *full_path, const char *dir_path
 }
 #endif
 
-static u32 compute_block_size()
+static u32 compute_block_size(void)
 {
 	return 4096;
 }
 
-static u32 compute_journal_blocks()
+static u32 compute_journal_blocks(void)
 {
 	u32 journal_blocks = DIV_ROUND_UP(info.len, info.block_size) / 64;
 	if (journal_blocks < 1024)
@@ -353,17 +357,17 @@ static u32 compute_journal_blocks()
 	return journal_blocks;
 }
 
-static u32 compute_blocks_per_group()
+static u32 compute_blocks_per_group(void)
 {
 	return info.block_size * 8;
 }
 
-static u32 compute_inodes()
+static u32 compute_inodes(void)
 {
 	return DIV_ROUND_UP(info.len, info.block_size) / 4;
 }
 
-static u32 compute_inodes_per_group()
+static u32 compute_inodes_per_group(void)
 {
 	u32 blocks = DIV_ROUND_UP(info.len, info.block_size);
 	u32 block_groups = DIV_ROUND_UP(blocks, info.blocks_per_group);
@@ -378,7 +382,7 @@ static u32 compute_inodes_per_group()
 	return inodes;
 }
 
-static u32 compute_bg_desc_reserve_blocks()
+static u32 compute_bg_desc_reserve_blocks(void)
 {
 	u32 blocks = DIV_ROUND_UP(info.len, info.block_size);
 	u32 block_groups = DIV_ROUND_UP(blocks, info.blocks_per_group);
@@ -395,7 +399,7 @@ static u32 compute_bg_desc_reserve_blocks()
 	return bg_desc_reserve_blocks;
 }
 
-void reset_ext4fs_info() {
+void reset_ext4fs_info(void) {
 	// Reset all the global data structures used by make_ext4fs so it
 	// can be called again.
 	memset(&info, 0, sizeof(info));
