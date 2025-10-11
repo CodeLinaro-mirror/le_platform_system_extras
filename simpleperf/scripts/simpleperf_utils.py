@@ -436,7 +436,7 @@ def open_report_in_browser(report_path: str):
 
 
 class BinaryFinder:
-    def __init__(self, binary_cache_dir: Optional[Union[Path, str]], readelf: ReadElf):
+    def __init__(self, binary_cache_dir: Optional[Union[Path, str]], readelf: Optional[ReadElf]):
         if isinstance(binary_cache_dir, str):
             binary_cache_dir = Path(binary_cache_dir)
         self.binary_cache_dir = binary_cache_dir
@@ -477,6 +477,8 @@ class BinaryFinder:
         return None
 
     def _check_path(self, path: Path, expected_build_id: Optional[str]) -> bool:
+        if not self.readelf:
+            return True
         if not self.readelf.is_elf_file(path):
             return False
         if expected_build_id is not None:
@@ -1019,10 +1021,13 @@ class Objdump(object):
 class ReadElf(object):
     """ A wrapper of readelf. """
 
-    def __init__(self, ndk_path: Optional[str]):
-        self.readelf_path = ToolFinder.find_tool_path('llvm-readelf', ndk_path)
-        if not self.readelf_path:
-            log_exit("Can't find llvm-readelf. " + NDK_ERROR_MESSAGE)
+    def __init__(self, ndk_path: Optional[str], readelf_path: Optional[str] = None):
+        if readelf_path:
+            self.readelf_path = readelf_path
+        else:
+            self.readelf_path = ToolFinder.find_tool_path('llvm-readelf', ndk_path)
+            if not self.readelf_path:
+                log_exit("Can't find llvm-readelf. " + NDK_ERROR_MESSAGE)
 
     @staticmethod
     def is_elf_file(path: Union[Path, str]) -> bool:
