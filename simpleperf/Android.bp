@@ -129,6 +129,7 @@ cc_defaults {
     defaults: [
         "libsimpleperf_readelf_defaults",
         "simpleperf_cflags",
+        "rust_static_std",
     ],
     host_supported: true,
     static_libs: [
@@ -171,6 +172,7 @@ cc_defaults {
     defaults: [
         "simpleperf_cflags",
         "libsimpleperf_readelf_defaults",
+        "rust_static_std",
     ],
     host_supported: true,
     shared_libs: [
