@@ -814,9 +814,12 @@ bool RecordFileReader::LoadBuildIdAndFileFeatures(ThreadTree& thread_tree) {
   for (auto& r : records) {
     if (!vdso_build_id.has_value() && strcmp("[vdso]", r.filename) == 0) {
       vdso_build_id = r.build_id;
-    } else if (vdso_build_id.has_value() && r.build_id == *vdso_build_id &&
-               std::filesystem::exists(r.filename)) {
-      Dso::SetVdsoFile(r.filename, sizeof(size_t) == sizeof(uint64_t));
+    } else if (vdso_build_id.has_value() && r.build_id == *vdso_build_id) {
+      std::error_code error_code;
+      auto status = std::filesystem::status(r.filename, error_code);
+      if (!error_code && std::filesystem::exists(status)) {
+        Dso::SetVdsoFile(r.filename, sizeof(size_t) == sizeof(uint64_t));
+      }
     }
 
     build_ids.push_back(std::make_pair(r.filename, r.build_id));
