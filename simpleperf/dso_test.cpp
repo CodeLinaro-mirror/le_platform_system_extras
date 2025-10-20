@@ -170,7 +170,7 @@ TEST(DebugElfFileFinder, find_basename_in_symfs_dir) {
 TEST(DebugElfFileFinder, build_id_mismatch) {
   DebugElfFileFinder finder;
   finder.SetSymFsDir(GetTestDataDir());
-  CapturedStderr capture;
+  android::base::CapturedStderr capture;
   BuildId mismatch_build_id("0c12a384a9f4a3f3659b7171ca615dbec3a81f71");
   std::string debug_file = finder.FindDebugFile(ELF_FILE, false, mismatch_build_id);
   capture.Stop();
@@ -365,7 +365,7 @@ TEST(dso, FunctionName) {
 TEST(dso, search_debug_file_only_when_needed) {
   Dso::SetBuildIds({std::make_pair("/elf", BuildId("1b12a384a9f4a3f3659b7171ca615dbec3a81f71"))});
   Dso::SetSymFsDir(GetTestDataDir());
-  CapturedStderr capture;
+  android::base::CapturedStderr capture;
   auto dso = Dso::CreateDso(DSO_ELF_FILE, "/elf");
   ASSERT_EQ(capture.str().find("build id mismatch"), std::string::npos);
   ASSERT_EQ(dso->GetDebugFilePath(), "/elf");
@@ -378,14 +378,14 @@ TEST(dso, read_symbol_warning) {
   {
     // Don't warn when the file may not be an ELF file.
     auto dso = Dso::CreateDso(DSO_ELF_FILE, GetTestData("not_exist_file"));
-    CapturedStderr capture;
+    android::base::CapturedStderr capture;
     dso->LoadSymbols();
     ASSERT_EQ(capture.str().find("failed to read symbols"), std::string::npos);
   }
   {
     // Don't warn when the file may not be an ELF file.
     auto dso = Dso::CreateDso(DSO_ELF_FILE, GetTestData("base.dex"));
-    CapturedStderr capture;
+    android::base::CapturedStderr capture;
     dso->LoadSymbols();
     ASSERT_EQ(capture.str().find("failed to read symbols"), std::string::npos);
   }
@@ -395,7 +395,7 @@ TEST(dso, read_symbol_warning) {
     Dso::SetBuildIds(
         {std::make_pair(file_path, BuildId("1b12a384a9f4a3f3659b7171ca615dbec3a81f71"))});
     auto dso = Dso::CreateDso(DSO_ELF_FILE, file_path);
-    CapturedStderr capture;
+    android::base::CapturedStderr capture;
     dso->LoadSymbols();
     ASSERT_NE(capture.str().find("failed to read symbols"), std::string::npos);
   }
@@ -408,7 +408,7 @@ TEST(dso, read_symbol_warning) {
     std::vector<Symbol> symbols;
     symbols.emplace_back("fake_symbol", 0x1234, 0x60);
     dso->SetSymbols(&symbols);
-    CapturedStderr capture;
+    android::base::CapturedStderr capture;
     dso->LoadSymbols();
     ASSERT_EQ(capture.str().find("failed to read symbols"), std::string::npos);
   }

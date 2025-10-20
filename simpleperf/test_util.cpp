@@ -108,7 +108,7 @@ static bool HasNonZeroInstructionEventCount() {
     return false;
   }
   // do some cpu work.
-  for (volatile int i = 0; i < 100000; ++i) {
+  for (volatile int i = 0; i < 100000; i += 1) {
   }
   PerfCounter counter;
   if (event_fd->ReadCounter(&counter)) {

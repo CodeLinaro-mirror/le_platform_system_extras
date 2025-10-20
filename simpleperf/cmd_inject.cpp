@@ -634,6 +634,9 @@ class ETMBranchListToAutoFDOConverter {
     BuildId build_id = key.build_id;
     std::unique_ptr<Dso> dso = Dso::CreateDsoWithBuildId(binary.dso_type, key.path, build_id);
     if (!dso || !CheckBuildId(dso.get(), key.build_id)) {
+      // Log at DEBUG level to avoid flooding the host log.
+      // Using LOG(INFO) can overwhelm the output with expected "not found" messages.
+      LOG(DEBUG) << "Not found debug binary for " << key.path << " with build id " << key.build_id;
       return nullptr;
     }
     std::unique_ptr<AutoFDOBinaryInfo> autofdo_binary(new AutoFDOBinaryInfo);
