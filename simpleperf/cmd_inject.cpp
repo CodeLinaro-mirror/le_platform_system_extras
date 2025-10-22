@@ -63,6 +63,35 @@ struct AutoFDOBinaryInfo {
   std::unordered_map<AddrPair, uint64_t, AddrPairHash> range_count_map;
   std::unordered_map<AddrPair, uint64_t, AddrPairHash> branch_count_map;
 
+  void GetExecutableSegments(const Dso* dso) {
+    CHECK(executable_segments.empty());
+    ElfStatus status;
+    auto elf = ElfFile::Open(dso->GetDebugFilePath(), &status);
+    if (!elf) {
+      return;
+    }
+    if (dso->type() == DSO_KERNEL_MODULE) {
+      // A kernel module file doesn't have program header. So create a fake one for .text section.
+      for (const auto& section : elf->GetSectionHeader()) {
+        if (section.name == ".text") {
+          executable_segments.resize(1);
+          auto& segment = executable_segments.back();
+          segment.vaddr = section.vaddr;
+          segment.file_offset = section.file_offset;
+          segment.file_size = section.size;
+          segment.is_executable = true;
+          segment.is_load = true;
+        }
+      }
+    } else {
+      executable_segments = elf->GetProgramHeader();
+      auto not_executable = [](const ElfSegment& s) { return !s.is_executable; };
+      executable_segments.erase(
+          std::remove_if(executable_segments.begin(), executable_segments.end(), not_executable),
+          executable_segments.end());
+    }
+  }
+
   void AddAddress(uint64_t addr) { OverflowSafeAdd(address_count_map[addr], 1); }
 
   void AddRange(uint64_t begin, uint64_t end) {
@@ -118,18 +147,6 @@ struct AutoFDOBinaryInfo {
 using AutoFDOBinaryCallback = std::function<void(const BinaryKey&, AutoFDOBinaryInfo&)>;
 using ETMBinaryCallback = std::function<void(const BinaryKey&, ETMBinary&)>;
 using LBRDataCallback = std::function<void(LBRData&)>;
-
-static std::vector<ElfSegment> GetExecutableSegments(const Dso* dso) {
-  std::vector<ElfSegment> segments;
-  ElfStatus status;
-  if (auto elf = ElfFile::Open(dso->GetDebugFilePath(), &status); elf) {
-    segments = elf->GetProgramHeader();
-    auto not_executable = [](const ElfSegment& s) { return !s.is_executable; };
-    segments.erase(std::remove_if(segments.begin(), segments.end(), not_executable),
-                   segments.end());
-  }
-  return segments;
-}
 
 // Base class for reading perf.data and generating AutoFDO or branch list data.
 class PerfDataReader {
@@ -200,7 +217,7 @@ class PerfDataReader {
     for (auto& p : autofdo_binary_map_) {
       const Dso* dso = p.first;
       AutoFDOBinaryInfo& binary = p.second;
-      binary.executable_segments = GetExecutableSegments(dso);
+      binary.GetExecutableSegments(dso);
       autofdo_callback_(BinaryKey(dso, 0), binary);
     }
   }
@@ -640,7 +657,7 @@ class ETMBranchListToAutoFDOConverter {
       return nullptr;
     }
     std::unique_ptr<AutoFDOBinaryInfo> autofdo_binary(new AutoFDOBinaryInfo);
-    autofdo_binary->executable_segments = GetExecutableSegments(dso.get());
+    autofdo_binary->GetExecutableSegments(dso.get());
 
     if (dso->type() == DSO_KERNEL) {
       CHECK_EQ(key.kernel_start_addr, 0);
@@ -1300,7 +1317,7 @@ class InjectCommand : public Command {
         if (!dso) {
           continue;
         }
-        binary.executable_segments = GetExecutableSegments(dso.get());
+        binary.GetExecutableSegments(dso.get());
         autofdo_writer.AddAutoFDOBinary(key, binary);
       }
     }

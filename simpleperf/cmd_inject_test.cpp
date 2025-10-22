@@ -129,26 +129,14 @@ TEST(cmd_inject, skip_empty_output_file) {
 }
 
 // @CddTest = 6.1/C-0-2
-TEST(cmd_inject, inject_kernel_data) {
+TEST(cmd_inject, inject_kernel_module_data) {
   const std::string recording_file =
-      GetTestData(std::string("etm") + OS_PATH_SEPARATOR + "perf_kernel.data");
+      GetTestData(std::string("etm") + OS_PATH_SEPARATOR + "perf_kernel_module_zram.data");
 
   // Inject directly to autofdo format.
-  TemporaryFile tmpfile;
-  close(tmpfile.release());
-  ASSERT_TRUE(RunInjectCmd({"-i", recording_file, "-o", tmpfile.path}));
-  std::string autofdo_output;
-  ASSERT_TRUE(android::base::ReadFileToString(tmpfile.path, &autofdo_output));
-  ASSERT_NE(autofdo_output.find("rq_stats.ko"), std::string::npos);
-
-  // Inject through etm branch list.
-  TemporaryFile tmpfile2;
-  close(tmpfile2.release());
-  ASSERT_TRUE(RunInjectCmd({"-i", recording_file, "-o", tmpfile.path, "--output", "branch-list"}));
-  ASSERT_TRUE(RunInjectCmd({"-i", tmpfile.path, "-o", tmpfile2.path}));
-  std::string output;
-  ASSERT_TRUE(android::base::ReadFileToString(tmpfile2.path, &output));
-  ASSERT_EQ(output, autofdo_output);
+  std::string autofdo_data;
+  ASSERT_TRUE(RunInjectCmd({"-i", recording_file}, &autofdo_data));
+  CheckMatchingExpectedData("perf_inject_kernel_module_zram.data", autofdo_data);
 }
 
 // @CddTest = 6.1/C-0-2

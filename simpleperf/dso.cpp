@@ -897,6 +897,9 @@ class KernelModuleDso : public Dso {
         kernel_dso_(kernel_dso) {}
 
   void SetMinExecutableVaddr(uint64_t min_vaddr, uint64_t memory_offset) override {
+    if (min_vaddr == 0 && memory_offset == 0) {
+      return;
+    }
     min_vaddr_ = min_vaddr;
     memory_offset_of_min_vaddr_ = memory_offset;
   }
@@ -914,6 +917,39 @@ class KernelModuleDso : public Dso {
     uint64_t memory_offset;
     GetMinExecutableVaddr(&min_vaddr, &memory_offset);
     return ip - map_start - memory_offset + min_vaddr;
+  }
+
+  std::optional<uint64_t> IpToFileOffset(uint64_t ip, uint64_t map_start,
+                                         uint64_t map_pgoff) override {
+    // For simplicity, we only convert IP addresses for .text section, ignoring .init.text section.
+    if (!min_vaddr_) {
+      CalculateMinVaddr();
+    }
+    if (min_vaddr_.value() == 0) {
+      return std::nullopt;
+    }
+    if (!text_section_) {
+      ElfStatus status;
+      BuildId build_id = GetExpectedBuildId();
+      auto elf = ElfFile::Open(GetDebugFilePath(), &build_id, &status);
+      if (elf) {
+        for (const auto& section : elf->GetSectionHeader()) {
+          if (section.name == ".text") {
+            text_section_ = section;
+            break;
+          }
+        }
+      }
+      if (!text_section_) {
+        return std::nullopt;
+      }
+    }
+    uint64_t vaddr_in_file = IpToVaddrInFile(ip, map_start, map_pgoff);
+    if (vaddr_in_file >= text_section_->vaddr &&
+        vaddr_in_file < text_section_->vaddr + text_section_->size) {
+      return vaddr_in_file - text_section_->vaddr + text_section_->file_offset;
+    }
+    return std::nullopt;
   }
 
  protected:
@@ -999,6 +1035,7 @@ class KernelModuleDso : public Dso {
   Dso* kernel_dso_;
   std::optional<uint64_t> min_vaddr_;
   std::optional<uint64_t> memory_offset_of_min_vaddr_;
+  std::optional<ElfSection> text_section_;
 };
 
 class SymbolMapFileDso : public Dso {
