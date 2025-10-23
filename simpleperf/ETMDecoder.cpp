@@ -981,6 +981,18 @@ class BranchDecoder {
   InstructionDecoder instruction_decoder_;
 };
 
+static uint64_t ConvertToVaddrInFile(Dso* dso, uint64_t addr) {
+  if (dso->type() == DSO_KERNEL_MODULE) {
+    // For a kernel module, we may or may not have converted ip addresses to vaddr in file, based on
+    // whether the kernel module file is accessible on device. So we need to handle both cases.
+    auto module_dso = static_cast<KernelModuleDso*>(dso);
+    if (addr >= module_dso->GetMemoryStart() && addr < module_dso->GetMemoryEnd()) {
+      return module_dso->IpToVaddrInFile(addr, module_dso->GetMemoryStart(), 0);
+    }
+  }
+  return addr;
+}
+
 android::base::expected<void, std::string> ConvertETMBranchMapToInstrRanges(
     Dso* dso, const ETMBranchMap& branch_map, const ETMDecoder::InstrRangeCallbackFn& callback) {
   BranchDecoder decoder;
@@ -1001,11 +1013,14 @@ android::base::expected<void, std::string> ConvertETMBranchMapToInstrRanges(
   std::unordered_map<uint64_t, MapEntry> cache;
 
   for (const auto& addr_p : branch_map) {
+    const uint64_t init_start_addr = ConvertToVaddrInFile(dso, addr_p.first & ~1ULL);
+
     for (const auto& branch_p : addr_p.second) {
       const std::vector<bool>& branch = branch_p.first;
       uint64_t count = branch_p.second;
-      uint64_t start_addr = addr_p.first & ~1ULL;
+      uint64_t start_addr = init_start_addr;
       bool is_thumb = addr_p.first & 1;
+
       for (bool b : branch) {
         auto it = cache.find(start_addr);
         if (it == cache.end()) {

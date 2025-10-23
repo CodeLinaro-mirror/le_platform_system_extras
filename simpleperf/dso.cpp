@@ -907,7 +907,11 @@ uint64_t KernelModuleDso::IpToVaddrInFile(uint64_t ip, uint64_t map_start, uint6
   uint64_t min_vaddr;
   uint64_t memory_offset;
   GetMinExecutableVaddr(&min_vaddr, &memory_offset);
-  return ip - map_start - memory_offset + min_vaddr;
+  if (min_vaddr != 0 || memory_offset != 0) {
+    return ip - map_start - memory_offset + min_vaddr;
+  }
+  // Return ip in memory if there isn't enough info to convert it to vaddr in file.
+  return ip;
 }
 
 std::optional<uint64_t> KernelModuleDso::IpToFileOffset(uint64_t ip, uint64_t map_start,
@@ -943,9 +947,47 @@ std::optional<uint64_t> KernelModuleDso::IpToFileOffset(uint64_t ip, uint64_t ma
   return std::nullopt;
 }
 
+void KernelModuleDso::FindDebugFilePath(BuildId& build_id) {
+  debug_file_path_ = debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+}
+
 std::string KernelModuleDso::FindDebugFilePath() const {
   BuildId build_id = GetExpectedBuildId();
   return debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+}
+
+void KernelModuleDso::SetFirstSymbolInMemory(const Symbol& symbol) {
+  first_symbol_in_memory = symbol;
+}
+
+const Symbol* KernelModuleDso::FindFirstSymbolInMemory() {
+  if (first_symbol_in_memory.has_value()) {
+    return &first_symbol_in_memory.value();
+  }
+  if (kernel_dso_ == nullptr) {
+    return nullptr;
+  }
+  kernel_dso_->LoadSymbols();
+  const auto& kernel_symbols = kernel_dso_->GetSymbols();
+  auto it = std::lower_bound(kernel_symbols.begin(), kernel_symbols.end(), memory_start_,
+                             CompareSymbolToAddr);
+  const Symbol* kernel_symbol = nullptr;
+  while (it != kernel_symbols.end() && it->addr < memory_end_) {
+    if (strlen(it->Name()) > 0 && it->Name()[0] != '$') {
+      kernel_symbol = &*it;
+      break;
+    }
+    ++it;
+  }
+  if (kernel_symbol == nullptr) {
+    return nullptr;
+  }
+  std::string symbol_name = kernel_symbol->Name();
+  if (auto pos = symbol_name.rfind(' '); pos != std::string::npos) {
+    symbol_name.resize(pos);
+  }
+  first_symbol_in_memory = Symbol(symbol_name, kernel_symbol->addr, kernel_symbol->len);
+  return &first_symbol_in_memory.value();
 }
 
 std::vector<Symbol> KernelModuleDso::LoadSymbolsImpl() {
@@ -988,30 +1030,15 @@ void KernelModuleDso::CalculateMinVaddr() {
   }
 
   // 1. Select a module symbol in /proc/kallsyms.
-  kernel_dso_->LoadSymbols();
-  const auto& kernel_symbols = kernel_dso_->GetSymbols();
-  auto it = std::lower_bound(kernel_symbols.begin(), kernel_symbols.end(), memory_start_,
-                             CompareSymbolToAddr);
-  const Symbol* kernel_symbol = nullptr;
-  while (it != kernel_symbols.end() && it->addr < memory_end_) {
-    if (strlen(it->Name()) > 0 && it->Name()[0] != '$') {
-      kernel_symbol = &*it;
-      break;
-    }
-    ++it;
-  }
+  const Symbol* kernel_symbol = FindFirstSymbolInMemory();
   if (kernel_symbol == nullptr) {
     return;
   }
 
   // 2. Find the symbol in .ko file.
-  std::string symbol_name = kernel_symbol->Name();
-  if (auto pos = symbol_name.rfind(' '); pos != std::string::npos) {
-    symbol_name.resize(pos);
-  }
   LoadSymbols();
   for (const auto& symbol : symbols_) {
-    if (symbol_name == symbol.Name()) {
+    if (strcmp(kernel_symbol->Name(), symbol.Name()) == 0) {
       min_vaddr_ = symbol.addr;
       memory_offset_of_min_vaddr_ = kernel_symbol->addr - memory_start_;
       return;
@@ -1067,9 +1094,6 @@ std::unique_ptr<Dso> Dso::CreateDsoWithBuildId(DsoType dso_type, const std::stri
       break;
     case DSO_KERNEL:
       dso.reset(new KernelDso(dso_path));
-      break;
-    case DSO_KERNEL_MODULE:
-      dso.reset(new KernelModuleDso(dso_path, 0, 0, nullptr));
       break;
     default:
       LOG(ERROR) << "Unexpected dso_type " << static_cast<int>(dso_type);
