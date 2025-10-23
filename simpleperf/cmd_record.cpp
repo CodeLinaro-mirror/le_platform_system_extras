@@ -1381,8 +1381,9 @@ bool RecordCommand::ParseOptions(const std::vector<std::string>& args,
     return false;
   }
 
-  if (dump_symbols_ && can_dump_kernel_symbols_) {
+  if (dump_symbols_ && can_dump_kernel_symbols_ && !event_selection_set_.HasAuxTrace()) {
     // No need to dump kernel symbols as we will dump all required symbols.
+    // For Aux trace, we need kernel symbols to do address conversion for kernel modules.
     can_dump_kernel_symbols_ = false;
   }
   if (clockid_.empty()) {
