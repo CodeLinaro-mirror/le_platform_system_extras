@@ -81,9 +81,9 @@ bool ReadSymbolsFromDexFile(const std::string& file_path,
   if (file_size == 0) {
     return false;
   }
-  std::unique_ptr<android::base::MappedFile> map;
-  map = android::base::MappedFile::FromFd(fd, 0, file_size, PROT_READ);
-  if (map == nullptr) {
+  auto map =
+      android::base::MappedFile::Create(android::base::borrowed_fd(fd), 0, file_size, PROT_READ);
+  if (!map) {
     return false;
   }
   return ReadSymbolsFromDexFileInMemory(map->data(), file_size, file_path, dex_file_offsets,

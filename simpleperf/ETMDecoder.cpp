@@ -696,7 +696,7 @@ class ETMDecoderImpl : public ETMDecoder {
         trace_id = cfg.reg_traceidr & 0x7f;
         trace_ids_.emplace(etm4.cpu, trace_id);
         configs_.emplace(trace_id, new EtmV4Config(&cfg));
-        info = reinterpret_cast<uint64_t*>(&etm4 + 1);
+        info += etm4.nrtrcparams + 3;
       } else {
         CHECK_EQ(info[0], AuxTraceInfoRecord::MAGIC_ETE);
         auto& ete = *reinterpret_cast<AuxTraceInfoRecord::ETEInfo*>(info);
@@ -714,7 +714,7 @@ class ETMDecoderImpl : public ETMDecoder {
         trace_id = cfg.reg_traceidr & 0x7f;
         trace_ids_.emplace(ete.cpu, trace_id);
         configs_.emplace(trace_id, new ETEConfig(&cfg));
-        info = reinterpret_cast<uint64_t*>(&ete + 1);
+        info += ete.nrtrcparams + 3;
       }
       decode_tree_.CreateDecoder(configs_[trace_id].get());
       auto result = packet_sinks_.emplace(trace_id, trace_id);

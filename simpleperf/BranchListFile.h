@@ -220,6 +220,10 @@ class BranchListProtoReader {
   static std::unique_ptr<BranchListProtoReader> CreateForString(const std::string& input_str);
   bool Read(ETMBinaryMap& etm_data, LBRData& lbr_data);
 
+  // only for testing
+  void CalculateMaxBranchesPerMessage() { calculate_max_branches_per_message_ = true; }
+  size_t GetMaxBranchesPerMessage() const { return max_branches_per_message_; }
+
  private:
   BranchListProtoReader(const std::string& input_filename, const std::string& input_str)
       : input_filename_(input_filename), input_fp_(nullptr, fclose), input_str_(input_str) {}
@@ -237,6 +241,8 @@ class BranchListProtoReader {
   const std::string& input_str_;
   size_t input_str_pos_ = 0;
   bool compress_ = false;
+  bool calculate_max_branches_per_message_ = false;
+  size_t max_branches_per_message_ = 0;
 };
 
 bool DumpBranchListFile(std::string filename);
