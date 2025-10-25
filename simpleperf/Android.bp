@@ -346,9 +346,15 @@ cc_library {
     srcs: ["profcollect.cpp"],
     host_supported: false,
     ldflags: ["-Wl,--exclude-libs=ALL"],
-    static_libs: ["libsimpleperf"],
+    static_libs: [
+        "libcmd",
+        "libsimpleperf",
+    ],
     shared_libs: [
+        "libbinder",
         "libpower",
+        "libselinux",
+        "libutils",
     ],
 }
 
