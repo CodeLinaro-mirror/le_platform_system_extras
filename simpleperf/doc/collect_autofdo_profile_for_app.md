@@ -13,16 +13,8 @@ flag set in its `AndroidManifests.xml`.
 
 ### 1. Flash a user build on Pixel 10
 
-On Pixel 10, AutoFDO profile collection for user build is supported on the BP4A and ZP1A branches,
-as long as the build date is 250829 or newer. Here are two example builds.
-
-```sh
-$ adb shell getprop | grep build
-[ro.build.fingerprint]: [google/frankel/frankel:16/BP4A.250916.007/14148704:user/dev-keys]
-
-$ adb shell getprop | grep build
-[ro.build.fingerprint]: [google/mustang/mustang:Baklava/ZP1A.250829.003.A1/14021912:user/dev-keys]
-```
+On Pixel 10, AutoFDO profile collection for user build is supported starting from 25Q4 (BP4A and
+later branches).
 
 ### 2. Find an app with C/C++ source code
 
@@ -39,14 +31,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdebug-info-for-profiling -mllvm -enabl
 
 ```
 
-Build a debuggable app. A released app with the `<profileable android:shell="true" />` flag is also
-fine, but it will need to use `-g` to add debug line info for converting instruction addresses to
-source lines.
+endless-tunnel has added the `<profileable android:shell="true" />` flag. So we can build a
+released app that is profileable. It's also fine to build a debuggable app.
 
 ### 4. Install the app
 
 ```sh
-$ app/build/outputs/apk/debug$ adb install -t app-debug.apk
+$ app/build/outputs/apk/debug$ adb install -t app-release.apk
 $ app/build/outputs/apk/debug$ adb shell pm -l | grep tunnel
 package:com.google.sample.tunnel
 ```
@@ -72,15 +63,15 @@ simpleperf I cmd_record.cpp:894] Record compressed: 15.24 MB (original 417.84 MB
 (host) $ simpleperf inject --dump branch_list.data >branch_list.dump
 (host) $ cat branch_list.dump | grep path
   ...
-  binary[18].path: /data/app/~~ErW3Jcve4l3TJIpr-Xd1Gg==/com.google.sample.tunnel-__S5TlI-NVCqbBSHkMauTw==/base.apk!/lib/arm64-v8a/libgame.so
+  binary[18].path: /data/app/~~CYyLxmCI1QHYKFwuWNvoUA==/com.google.sample.tunnel-c0qGzW5EkVZtHZXqGPZIoQ==/base.apk!/lib/arm64-v8a/libgame.so
   ...
 # Convert branch lists for libgame.so to AutoFDO profile.
 (host) $ simpleperf inject -i branch_list.data -o libgame_autofdo.txt --binary libgame.so --log debug
 simpleperf D command.cpp:288] command 'inject' starts running
-simpleperf D cmd_inject.cpp:637] Not found debug binary for /data/app/~~ErW3Jcve4l3TJIpr-Xd1Gg==/com.google.sample.tunnel-__S5TlI-NVCqbBSHkMauTw==/base.apk!/lib/arm64-v8a/libgame.so with build id 0x288376bbae66d18a0e54e81cbef194b2342aa880
+simpleperf D cmd_inject.cpp:637] Not found debug binary for /data/app/~~CYyLxmCI1QHYKFwuWNvoUA==/com.google.sample.tunnel-c0qGzW5EkVZtHZXqGPZIoQ==/base.apk!/lib/arm64-v8a/libgame.so with build id 0x288376bbae66d18a0e54e81cbef194b2342aa880
 simpleperf D command.cpp:291] command 'inject' finished successfully
 # The warning shows simpleperf didn't find debug binary for libgame.so. Let's provide it.
-(host) $ $ simpleperf inject -i branch_list.data -o libgame_autofdo.txt --binary libgame --log debug --symdir ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/build/intermediates/cxx/Debug/3bh34153/obj/arm64-v8a/
+(host) $ $ simpleperf inject -i branch_list.data -o libgame_autofdo.txt --binary libgame.so --log debug --symdir ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/build/intermediates/cxx/RelWithDebInfo/5j224z5k/obj/arm64-v8a
 simpleperf D command.cpp:288] command 'inject' starts running
 simpleperf D command.cpp:291] command 'inject' finished successfully
 (host) $ ls -lh
@@ -88,7 +79,7 @@ simpleperf D command.cpp:291] command 'inject' finished successfully
 
 # Run create_llvm_prof to convert AutoFDO input file to AutoFDO profile.
 # create_llvm_prof can be downloaded or built from https://github.com/google/autofdo.
-(host) $ create_llvm_prof --profiler text -profile=libgame_autofdo.txt --out=libgame.llvm_profdata --prof_sym_list=false --format=extbinary --binary ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/build/intermediates/cxx/Debug/3bh34153/obj/arm64-v8a/libgame.so
+(host) $ create_llvm_prof --profiler text -profile=libgame_autofdo.txt --out=libgame.llvm_profdata --prof_sym_list=false --format=extbinary --binary ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/build/intermediates/cxx/RelWithDebInfo/5j224z5k/obj/arm64-v8a/libgame.so
 (host) $ ls -lh
 -rw-r--r-- 1 yabinc primarygroup  18K Sep 22 15:44 libgame.llvm_profdata
 
@@ -97,17 +88,34 @@ simpleperf D command.cpp:291] command 'inject' finished successfully
 (host) $ llvm-profdata show --sample --hot-func-list libgame.llvm_profdata >libgame_hot_functions.txt
 ```
 
-To get good coverage, you usually need to record multiple times and record for a longer duration
-each time. Multiple `branch_list.data` files can be merged into one when converting branch lists to
-an AutoFDO profile, for example: `simpleperf inject -i branch_list1.data,branch_list2.data`.
+Currently we are recording ETM data for all userspace libraries for the app process. But we only
+want to optimize `libgame.so`. ETM data for other libraries are wasting bandwidth. So we can use
+address filter to only capture ETM data for `libgame.so`.
 
+```sh
+mustang:/data/local/tmp $ simpleperf record --app com.google.sample.tunnel -e cs-etm:u \
+  --duration 10 -z --addr-filter 'filter /data/app/~~CYyLxmCI1QHYKFwuWNvoUA==/com.google.sample.tunnel-c0qGzW5EkVZtHZXqGPZIoQ==/base.apk!/lib/arm64-v8a/libgame.so'
+
+# It's also fine to use the whole apk file as the address filter.
+mustang:/data/local/tmp $ simpleperf record --app com.google.sample.tunnel -e cs-etm:u \
+  --duration 10 -z --addr-filter 'filter /data/app/~~CYyLxmCI1QHYKFwuWNvoUA==/com.google.sample.tunnel-c0qGzW5EkVZtHZXqGPZIoQ==/base.apk'
+```
+
+To get good coverage, you usually need to record multiple times and record for a longer duration
+each time. Multiple `perf.data` or `branch_list.data` files can be merged into one when converting
+them to an AutoFDO profile.
+
+```sh
+(host) simpleperf inject -i perf.data,perf2.data,perf3.data,perf4.data,perf5.data -o branch_list.data --output branch-list
+(host) $ $ simpleperf inject -i branch_list.data -o libgame_autofdo.txt --binary libgame.so --log debug --symdir ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/build/intermediates/cxx/RelWithDebInfo/5j224z5k/obj/arm64-v8a
+```
 
 ### 6. Use AutoFDO profile when building the app
 
 
 ```sh
 # Copy libgame.llvm_profdata to the source code directory.
-$ cp libgame.llvm_profdata ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/src/main/cpp
+(host) $ cp libgame.llvm_profdata ~/AndroidStudioProjects/simpleperf_demo/test_apps/endless-tunnel/app/src/main/cpp
 ```
 
 Modify `CMakeLists.txt`.
@@ -117,10 +125,23 @@ Modify `CMakeLists.txt`.
 # Set clang options to use AutoFDO profile
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -improved-fs-discriminator=true -funique-internal-linkage-names")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-sample-use=${CMAKE_CURRENT_SOURCE_DIR}/libgame.llvm_profdata")
+
 # It's optional to add -fprofile-sample-accurate. Once added, it may de-optimize cold functions.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-sample-accurate")
+
+# Set dependency on the profile. So the source files are rebuilt when the profile is changed.
+set_source_files_properties(${MY_SOURCES} PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/libgame.llvm_profdata)
 
 ```
 
 To get performance gains from AutoFDO, you need to enable optimization, which means using `-O2`
-or `-O3` in `CMakeLists.txt`, or creating a Release build.
+or `-O3` in `CMakeLists.txt`, or creating a Release build. We can compare the .text section before
+and after using AutoFDO profile. In most cases, it should change the .text of the binary, which can
+be quickly verified by checking that the size of the .text changes when the AutoFDO profile is used.
+
+```sh
+(host) readelf -SW without_profile_libgame.so
+[14] .text             PROGBITS        0000000000027c90 027c90 02d974 00  AX  0   0 16
+(host) readelf -SW with_profile_libgame.so
+[14] .text             PROGBITS        0000000000028840 028840 02d77c 00  AX  0   0 16
+```
