@@ -1140,6 +1140,17 @@ TEST(record_cmd, cs_etm_system_wide) {
   }
   ASSERT_TRUE(has_kernel_build_id);
 
+  // Check if kernel symbols are dumped.
+  bool has_kernel_symbols = false;
+  auto process_record = [&](std::unique_ptr<Record> r) {
+    if (r->type() == SIMPLE_PERF_RECORD_KERNEL_SYMBOL) {
+      has_kernel_symbols = true;
+    }
+    return true;
+  };
+  ASSERT_TRUE(reader->ReadDataSection(process_record));
+  ASSERT_TRUE(has_kernel_symbols);
+
   // build ids are not dumped if --no-dump-build-id is used.
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "-a", "--no-dump-build-id"}, tmpfile.path));
   reader = RecordFileReader::CreateInstance(tmpfile.path);

@@ -75,20 +75,8 @@ fn main() -> Result<()> {
             println!("Reset done.");
         }
         Commands::SetProperty => {
-            let old_value = system_properties::read("persist.profcollectd.enabled")?
-                .unwrap_or("false".to_string());
-            let new_value =
-                match GetServerConfigurableFlag("profcollect_native_boot", "enabled", "false")
-                    .as_str()
-                {
-                    "1" | "y" | "yes" | "on" | "true" => "true",
-                    "0" | "n" | "no" | "off" | "false" => "false",
-                    invalid => anyhow::bail!("Failed to parse server flag as bool: {}", &invalid),
-                };
-
-            if old_value != new_value {
-                system_properties::write("persist.profcollectd.enabled", new_value)?;
-            }
+            libprofcollectd::write_config_to_properties()
+                .context("Failed to write config to properties.")?;
         }
         Commands::DumpProperty => {
             let curr_value =

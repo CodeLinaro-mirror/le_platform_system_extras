@@ -292,17 +292,14 @@ ETMBinaryMap ETMBranchListGeneratorImpl::GetETMBinaryMap() {
     Dso* dso = p.first;
     ETMBinary& binary = p.second;
     binary.dso_type = dso->type();
-    BuildId build_id;
-    GetBuildId(*dso, build_id);
-    BinaryKey key(dso->Path(), build_id);
     if (binary.dso_type == DSO_KERNEL) {
       if (kernel_map_start_addr_ == 0) {
         LOG(WARNING) << "Can't convert kernel ip addresses without kernel start addr. So remove "
                         "branches for the kernel.";
         continue;
       }
-      key.kernel_start_addr = kernel_map_start_addr_;
     }
+    BinaryKey key(dso, kernel_map_start_addr_);
     binary_map[key] = std::move(binary);
   }
   return binary_map;
@@ -368,6 +365,14 @@ bool BranchListProtoWriter::Write(const ETMBinaryMap& etm_data) {
     proto_binary->set_type(opt_binary_type.value());
     if (binary.dso_type == DSO_KERNEL) {
       proto_binary->mutable_kernel_info()->set_kernel_start_addr(key.kernel_start_addr);
+    } else if (binary.dso_type == DSO_KERNEL_MODULE) {
+      const auto& module_info = key.kernel_module_info;
+      auto proto_module = proto_binary->mutable_kernel_module_info();
+      proto_module->set_memory_start(module_info.memory_start);
+      proto_module->set_memory_end(module_info.memory_end);
+      proto_module->set_memory_symbol_name(module_info.memory_symbol_name);
+      proto_module->set_memory_symbol_addr(module_info.memory_symbol_addr);
+      proto_module->set_memory_symbol_len(module_info.memory_symbol_len);
     }
     return true;
   };
@@ -552,6 +557,14 @@ bool BranchListProtoReader::AddETMBinary(const proto::ETMBinary& proto_binary,
   BinaryKey key(proto_binary.path(), BuildId(proto_binary.build_id()));
   if (proto_binary.has_kernel_info()) {
     key.kernel_start_addr = proto_binary.kernel_info().kernel_start_addr();
+  } else if (proto_binary.has_kernel_module_info()) {
+    auto& module_info = key.kernel_module_info;
+    const auto& proto_module = proto_binary.kernel_module_info();
+    module_info.memory_start = proto_module.memory_start();
+    module_info.memory_end = proto_module.memory_end();
+    module_info.memory_symbol_name = proto_module.memory_symbol_name();
+    module_info.memory_symbol_addr = proto_module.memory_symbol_addr();
+    module_info.memory_symbol_len = proto_module.memory_symbol_len();
   }
   ETMBinary& binary = etm_data[key];
   auto dso_type = ToDsoType(proto_binary.type());
@@ -727,6 +740,18 @@ bool DumpBranchListFile(std::string filename) {
       if (binary.dso_type == DSO_KERNEL) {
         PrintIndented(1, "binary[%zu].kernel_start_addr: 0x%" PRIx64 "\n", i,
                       key.kernel_start_addr);
+      } else if (binary.dso_type == DSO_KERNEL_MODULE) {
+        const auto& module_info = key.kernel_module_info;
+        PrintIndented(1, "binary[%zu].kernel_module_memory_start: 0x%" PRIx64 "\n", i,
+                      module_info.memory_start);
+        PrintIndented(1, "binary[%zu].kernel_module_memory_end: 0x%" PRIx64 "\n", i,
+                      module_info.memory_end);
+        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_name: %s\n", i,
+                      module_info.memory_symbol_name.c_str());
+        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_addr: 0x%" PRIx64 "\n", i,
+                      module_info.memory_symbol_addr);
+        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_len: 0x%" PRIx64 "\n", i,
+                      module_info.memory_symbol_len);
       }
       PrintIndented(1, "binary[%zu].addrs:\n", i);
       size_t addr_id = 0;

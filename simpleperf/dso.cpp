@@ -887,119 +887,164 @@ class KernelDso : public Dso {
   std::optional<uint64_t> kernel_start_file_offset_;
 };
 
-class KernelModuleDso : public Dso {
- public:
-  KernelModuleDso(const std::string& path, uint64_t memory_start, uint64_t memory_end,
-                  Dso* kernel_dso)
-      : Dso(DSO_KERNEL_MODULE, path),
-        memory_start_(memory_start),
-        memory_end_(memory_end),
-        kernel_dso_(kernel_dso) {}
-
-  void SetMinExecutableVaddr(uint64_t min_vaddr, uint64_t memory_offset) override {
-    min_vaddr_ = min_vaddr;
-    memory_offset_of_min_vaddr_ = memory_offset;
+void KernelModuleDso::SetMinExecutableVaddr(uint64_t min_vaddr, uint64_t memory_offset) {
+  if (min_vaddr == 0 && memory_offset == 0) {
+    return;
   }
+  min_vaddr_ = min_vaddr;
+  memory_offset_of_min_vaddr_ = memory_offset;
+}
 
-  void GetMinExecutableVaddr(uint64_t* min_vaddr, uint64_t* memory_offset) override {
-    if (!min_vaddr_) {
-      CalculateMinVaddr();
-    }
-    *min_vaddr = min_vaddr_.value();
-    *memory_offset = memory_offset_of_min_vaddr_.value();
+void KernelModuleDso::GetMinExecutableVaddr(uint64_t* min_vaddr, uint64_t* memory_offset) {
+  if (!min_vaddr_) {
+    CalculateMinVaddr();
   }
+  *min_vaddr = min_vaddr_.value();
+  *memory_offset = memory_offset_of_min_vaddr_.value();
+}
 
-  uint64_t IpToVaddrInFile(uint64_t ip, uint64_t map_start, uint64_t) override {
-    uint64_t min_vaddr;
-    uint64_t memory_offset;
-    GetMinExecutableVaddr(&min_vaddr, &memory_offset);
+uint64_t KernelModuleDso::IpToVaddrInFile(uint64_t ip, uint64_t map_start, uint64_t) {
+  uint64_t min_vaddr;
+  uint64_t memory_offset;
+  GetMinExecutableVaddr(&min_vaddr, &memory_offset);
+  if (min_vaddr != 0 || memory_offset != 0) {
     return ip - map_start - memory_offset + min_vaddr;
   }
+  // Return ip in memory if there isn't enough info to convert it to vaddr in file.
+  return ip;
+}
 
- protected:
-  std::string FindDebugFilePath() const override {
-    BuildId build_id = GetExpectedBuildId();
-    return debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+std::optional<uint64_t> KernelModuleDso::IpToFileOffset(uint64_t ip, uint64_t map_start,
+                                                        uint64_t map_pgoff) {
+  // For simplicity, we only convert IP addresses for .text section, ignoring .init.text section.
+  if (!min_vaddr_) {
+    CalculateMinVaddr();
   }
-
-  std::vector<Symbol> LoadSymbolsImpl() override {
-    std::vector<Symbol> symbols;
-    BuildId build_id = GetExpectedBuildId();
-    auto symbol_callback = [&](const ElfFileSymbol& symbol) {
-      // We only know how to map ip addrs to symbols in text section.
-      if (symbol.is_in_text_section && (symbol.is_label || symbol.is_func)) {
-        symbols.emplace_back(symbol.name, symbol.vaddr, symbol.len);
-      }
-    };
+  if (min_vaddr_.value() == 0) {
+    return std::nullopt;
+  }
+  if (!text_section_) {
     ElfStatus status;
+    BuildId build_id = GetExpectedBuildId();
     auto elf = ElfFile::Open(GetDebugFilePath(), &build_id, &status);
     if (elf) {
-      status = elf->ParseSymbols(symbol_callback);
-    }
-    // Don't warn when a kernel module is missing. As a backup, we read symbols from /proc/kallsyms.
-    ReportReadElfSymbolResult(status, path_, GetDebugFilePath(), android::base::DEBUG);
-    SortAndFixSymbols(symbols);
-    return symbols;
-  }
-
- private:
-  void CalculateMinVaddr() {
-    min_vaddr_ = 0;
-    memory_offset_of_min_vaddr_ = 0;
-
-    // min_vaddr and memory_offset are used to convert an ip addr of a kernel module to its
-    // vaddr_in_file, as shown in IpToVaddrInFile(). When the kernel loads a kernel module, it
-    // puts ALLOC sections (like .plt, .text.ftrace_trampoline, .text) in memory in order. The
-    // text section may not be at the start of the module memory. To do address conversion, we
-    // need to know its relative position in the module memory. There are two ways:
-    // 1. Read the kernel module file to calculate the relative position of .text section. It
-    // is relatively complex and depends on both PLT entries and the kernel version.
-    // 2. Find a module symbol in .text section, get its address in memory from /proc/kallsyms,
-    // and its vaddr_in_file from the kernel module file. Then other symbols in .text section can
-    // be mapped in the same way. Below we use the second method.
-
-    if (!IsRegularFile(GetDebugFilePath())) {
-      return;
-    }
-
-    // 1. Select a module symbol in /proc/kallsyms.
-    kernel_dso_->LoadSymbols();
-    const auto& kernel_symbols = kernel_dso_->GetSymbols();
-    auto it = std::lower_bound(kernel_symbols.begin(), kernel_symbols.end(), memory_start_,
-                               CompareSymbolToAddr);
-    const Symbol* kernel_symbol = nullptr;
-    while (it != kernel_symbols.end() && it->addr < memory_end_) {
-      if (strlen(it->Name()) > 0 && it->Name()[0] != '$') {
-        kernel_symbol = &*it;
-        break;
-      }
-      ++it;
-    }
-    if (kernel_symbol == nullptr) {
-      return;
-    }
-
-    // 2. Find the symbol in .ko file.
-    std::string symbol_name = kernel_symbol->Name();
-    if (auto pos = symbol_name.rfind(' '); pos != std::string::npos) {
-      symbol_name.resize(pos);
-    }
-    LoadSymbols();
-    for (const auto& symbol : symbols_) {
-      if (symbol_name == symbol.Name()) {
-        min_vaddr_ = symbol.addr;
-        memory_offset_of_min_vaddr_ = kernel_symbol->addr - memory_start_;
-        return;
+      for (const auto& section : elf->GetSectionHeader()) {
+        if (section.name == ".text") {
+          text_section_ = section;
+          break;
+        }
       }
     }
+    if (!text_section_) {
+      return std::nullopt;
+    }
+  }
+  uint64_t vaddr_in_file = IpToVaddrInFile(ip, map_start, map_pgoff);
+  if (vaddr_in_file >= text_section_->vaddr &&
+      vaddr_in_file < text_section_->vaddr + text_section_->size) {
+    return vaddr_in_file - text_section_->vaddr + text_section_->file_offset;
+  }
+  return std::nullopt;
+}
+
+void KernelModuleDso::FindDebugFilePath(BuildId& build_id) {
+  debug_file_path_ = debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+}
+
+std::string KernelModuleDso::FindDebugFilePath() const {
+  BuildId build_id = GetExpectedBuildId();
+  return debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+}
+
+void KernelModuleDso::SetFirstSymbolInMemory(const Symbol& symbol) {
+  first_symbol_in_memory = symbol;
+}
+
+const Symbol* KernelModuleDso::FindFirstSymbolInMemory() {
+  if (first_symbol_in_memory.has_value()) {
+    return &first_symbol_in_memory.value();
+  }
+  if (kernel_dso_ == nullptr) {
+    return nullptr;
+  }
+  kernel_dso_->LoadSymbols();
+  const auto& kernel_symbols = kernel_dso_->GetSymbols();
+  auto it = std::lower_bound(kernel_symbols.begin(), kernel_symbols.end(), memory_start_,
+                             CompareSymbolToAddr);
+  const Symbol* kernel_symbol = nullptr;
+  while (it != kernel_symbols.end() && it->addr < memory_end_) {
+    if (strlen(it->Name()) > 0 && it->Name()[0] != '$') {
+      kernel_symbol = &*it;
+      break;
+    }
+    ++it;
+  }
+  if (kernel_symbol == nullptr) {
+    return nullptr;
+  }
+  std::string symbol_name = kernel_symbol->Name();
+  if (auto pos = symbol_name.rfind(' '); pos != std::string::npos) {
+    symbol_name.resize(pos);
+  }
+  first_symbol_in_memory = Symbol(symbol_name, kernel_symbol->addr, kernel_symbol->len);
+  return &first_symbol_in_memory.value();
+}
+
+std::vector<Symbol> KernelModuleDso::LoadSymbolsImpl() {
+  std::vector<Symbol> symbols;
+  BuildId build_id = GetExpectedBuildId();
+  auto symbol_callback = [&](const ElfFileSymbol& symbol) {
+    // We only know how to map ip addrs to symbols in text section.
+    if (symbol.is_in_text_section && (symbol.is_label || symbol.is_func)) {
+      symbols.emplace_back(symbol.name, symbol.vaddr, symbol.len);
+    }
+  };
+  ElfStatus status;
+  auto elf = ElfFile::Open(GetDebugFilePath(), &build_id, &status);
+  if (elf) {
+    status = elf->ParseSymbols(symbol_callback);
+  }
+  // Don't warn when a kernel module is missing. As a backup, we read symbols from /proc/kallsyms.
+  ReportReadElfSymbolResult(status, path_, GetDebugFilePath(), android::base::DEBUG);
+  SortAndFixSymbols(symbols);
+  return symbols;
+}
+
+void KernelModuleDso::CalculateMinVaddr() {
+  min_vaddr_ = 0;
+  memory_offset_of_min_vaddr_ = 0;
+
+  // min_vaddr and memory_offset are used to convert an ip addr of a kernel module to its
+  // vaddr_in_file, as shown in IpToVaddrInFile(). When the kernel loads a kernel module, it
+  // puts ALLOC sections (like .plt, .text.ftrace_trampoline, .text) in memory in order. The
+  // text section may not be at the start of the module memory. To do address conversion, we
+  // need to know its relative position in the module memory. There are two ways:
+  // 1. Read the kernel module file to calculate the relative position of .text section. It
+  // is relatively complex and depends on both PLT entries and the kernel version.
+  // 2. Find a module symbol in .text section, get its address in memory from /proc/kallsyms,
+  // and its vaddr_in_file from the kernel module file. Then other symbols in .text section can
+  // be mapped in the same way. Below we use the second method.
+
+  if (!IsRegularFile(GetDebugFilePath())) {
+    return;
   }
 
-  uint64_t memory_start_;
-  uint64_t memory_end_;
-  Dso* kernel_dso_;
-  std::optional<uint64_t> min_vaddr_;
-  std::optional<uint64_t> memory_offset_of_min_vaddr_;
-};
+  // 1. Select a module symbol in /proc/kallsyms.
+  const Symbol* kernel_symbol = FindFirstSymbolInMemory();
+  if (kernel_symbol == nullptr) {
+    return;
+  }
+
+  // 2. Find the symbol in .ko file.
+  LoadSymbols();
+  for (const auto& symbol : symbols_) {
+    if (strcmp(kernel_symbol->Name(), symbol.Name()) == 0) {
+      min_vaddr_ = symbol.addr;
+      memory_offset_of_min_vaddr_ = kernel_symbol->addr - memory_start_;
+      return;
+    }
+  }
+}
 
 class SymbolMapFileDso : public Dso {
  public:
@@ -1049,9 +1094,6 @@ std::unique_ptr<Dso> Dso::CreateDsoWithBuildId(DsoType dso_type, const std::stri
       break;
     case DSO_KERNEL:
       dso.reset(new KernelDso(dso_path));
-      break;
-    case DSO_KERNEL_MODULE:
-      dso.reset(new KernelModuleDso(dso_path, 0, 0, nullptr));
       break;
     default:
       LOG(ERROR) << "Unexpected dso_type " << static_cast<int>(dso_type);

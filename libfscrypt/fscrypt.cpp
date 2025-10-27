@@ -165,6 +165,9 @@ bool OptionsToStringForApiLevel(unsigned int first_api_level, const EncryptionOp
         case KeyType::kHwWrappedV0:
             *options_string += "+wrappedkey_v0";
             break;
+        case KeyType::kHwWrapped:
+            *options_string += "+wrappedkey";
+            break;
     }
     if (options.dusize_4k) {
         *options_string += "+dusize_4k";
@@ -230,6 +233,8 @@ bool ParseOptionsForApiLevel(unsigned int first_api_level, const std::string& op
                 options->flags |= FSCRYPT_POLICY_FLAG_IV_INO_LBLK_32;
             } else if (flag == "wrappedkey_v0") {
                 options->key_type = KeyType::kHwWrappedV0;
+            } else if (flag == "wrappedkey") {
+                options->key_type = KeyType::kHwWrapped;
             } else if (flag == "dusize_4k") {
                 options->dusize_4k = true;
             } else {
