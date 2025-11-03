@@ -239,7 +239,7 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
   selection->event_attr.precise_ip = event_type->precise_ip;
   if (event_type->event_type.IsEtmEvent()) {
     auto& etm_recorder = ETMRecorder::GetInstance();
-    bool need_etr = event_type->event_type.name.find("@tmc_etr0") != std::string::npos;
+    bool need_etr = event_type->event_type.name.find("etr") != std::string::npos;
     if (auto result = etm_recorder.CheckEtmSupport(need_etr); !result.ok()) {
       LOG(ERROR) << result.error();
       return false;
@@ -251,7 +251,10 @@ bool EventSelectionSet::BuildAndCheckEventSelection(const std::string& event_nam
       return false;
     }
 #endif
-    ETMRecorder::GetInstance().SetEtmPerfEventAttr(event_type->event_type, selection->event_attr);
+    if (!ETMRecorder::GetInstance().SetEtmPerfEventAttr(event_type->event_type,
+                                                        selection->event_attr)) {
+      return false;
+    }
     if (IsKernelUsingContiguousAuxBuffer()) {
       // The kernel (rb_allocate_aux) allocates high order of pages based on aux_watermark.
       // To avoid that, use aux_watermark <= 1 page size.
