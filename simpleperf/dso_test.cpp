@@ -343,6 +343,35 @@ TEST(dso, kernel_module_CalculateMinVaddr) {
 }
 
 // @CddTest = 6.1/C-0-2
+TEST(dso, kernel_module_IpToFileOffset) {
+  // Create fake Dso objects.
+  auto kernel_dso = Dso::CreateDso(DSO_KERNEL, DEFAULT_KERNEL_MMAP_NAME);
+  ASSERT_TRUE(kernel_dso);
+  const uint64_t module_memory_start = 0xffffffe3f682c000ULL;
+  const uint64_t module_memory_size = 0xf000ULL;
+  auto module_dso =
+      Dso::CreateKernelModuleDso(GetTestData("etm/zram.ko"), module_memory_start,
+                                 module_memory_start + module_memory_size, kernel_dso.get());
+  ASSERT_TRUE(module_dso);
+
+  // Provide symbol info for calculating min vaddr.
+  std::vector<Symbol> kernel_symbols;
+  kernel_symbols.emplace_back("__traceiter_zcomp_decompress_start [zram]", 0xffffffe3f682c4f0ULL,
+                              0x78);
+  kernel_dso->SetSymbols(&kernel_symbols);
+
+  // Calculate min vaddr.
+  uint64_t min_vaddr;
+  uint64_t memory_offset;
+  module_dso->GetMinExecutableVaddr(&min_vaddr, &memory_offset);
+  ASSERT_EQ(min_vaddr, 0x4);
+  ASSERT_EQ(memory_offset, 0x4f0);
+
+  ASSERT_EQ(module_dso->IpToVaddrInFile(0xffffffe3f682c4f0ULL, module_memory_start, 0), 0x4);
+  ASSERT_EQ(module_dso->IpToFileOffset(0xffffffe3f682c4f0ULL, module_memory_start, 0), 0x2004);
+}
+
+// @CddTest = 6.1/C-0-2
 TEST(dso, symbol_map_file) {
   auto dso = Dso::CreateDso(DSO_SYMBOL_MAP_FILE, "perf-123.map");
   ASSERT_TRUE(dso);
