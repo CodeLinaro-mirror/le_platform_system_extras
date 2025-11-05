@@ -18,10 +18,19 @@
 
 #include "ETMDecoder.h"
 #include "RegEx.h"
+#include "dso.h"
 #include "thread_tree.h"
 #include "utils.h"
 
 namespace simpleperf {
+
+struct KernelModuleInfo {
+  uint64_t memory_start = 0;
+  uint64_t memory_end = 0;
+  std::string memory_symbol_name;
+  uint64_t memory_symbol_addr = 0;
+  uint64_t memory_symbol_len = 0;
+};
 
 // When processing binary info in an input file, the binaries are identified by their path.
 // But this isn't sufficient when merging binary info from multiple input files. Because
@@ -33,24 +42,40 @@ struct BinaryKey {
   std::string path;
   BuildId build_id;
   uint64_t kernel_start_addr = 0;
+  KernelModuleInfo kernel_module_info;
 
   BinaryKey() {}
 
   BinaryKey(const std::string& path, BuildId build_id) : path(path), build_id(build_id) {}
 
-  BinaryKey(const Dso* dso, uint64_t kernel_start_addr) : path(dso->Path()) {
+  BinaryKey(Dso* dso, uint64_t kernel_start_addr) : path(dso->Path()) {
     build_id = Dso::FindExpectedBuildIdForPath(dso->Path());
     if (build_id.IsEmpty()) {
       GetBuildId(*dso, build_id);
     }
     if (dso->type() == DSO_KERNEL) {
       this->kernel_start_addr = kernel_start_addr;
+    } else if (dso->type() == DSO_KERNEL_MODULE) {
+      KernelModuleDso* module_dso = static_cast<KernelModuleDso*>(dso);
+      kernel_module_info.memory_start = module_dso->GetMemoryStart();
+      kernel_module_info.memory_end = module_dso->GetMemoryEnd();
+      const Symbol* symbol = module_dso->FindFirstSymbolInMemory();
+      if (symbol != nullptr) {
+        kernel_module_info.memory_symbol_name = symbol->Name();
+        kernel_module_info.memory_symbol_addr = symbol->addr;
+        kernel_module_info.memory_symbol_len = symbol->len;
+      }
     }
   }
 
   bool operator==(const BinaryKey& other) const {
     return path == other.path && build_id == other.build_id &&
-           kernel_start_addr == other.kernel_start_addr;
+           kernel_start_addr == other.kernel_start_addr &&
+           kernel_module_info.memory_start == other.kernel_module_info.memory_start &&
+           kernel_module_info.memory_end == other.kernel_module_info.memory_end &&
+           kernel_module_info.memory_symbol_name == other.kernel_module_info.memory_symbol_name &&
+           kernel_module_info.memory_symbol_addr == other.kernel_module_info.memory_symbol_addr &&
+           kernel_module_info.memory_symbol_len == other.kernel_module_info.memory_symbol_len;
   }
 };
 
@@ -61,6 +86,9 @@ struct BinaryKeyHash {
     HashCombine(seed, key.build_id);
     if (key.kernel_start_addr != 0) {
       HashCombine(seed, key.kernel_start_addr);
+    } else if (key.kernel_module_info.memory_start != 0) {
+      HashCombine(seed, key.kernel_module_info.memory_start);
+      HashCombine(seed, key.kernel_module_info.memory_end);
     }
     return seed;
   }
