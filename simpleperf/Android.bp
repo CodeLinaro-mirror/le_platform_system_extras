@@ -405,8 +405,14 @@ cc_binary {
         "libsimpleperf",
     ],
 
-    min_sdk_version: "31",
+    min_sdk_version: "29",
     target: {
+        android: {
+            static_libs: [
+                // On Android 10 (sdk version 29), libc.so doesn't export libunwind symbols.
+                "libunwind",
+            ],
+        },
         android_arm: {
             dist: {
                 dir: "simpleperf/android/arm",
