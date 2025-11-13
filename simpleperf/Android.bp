@@ -405,8 +405,14 @@ cc_binary {
         "libsimpleperf",
     ],
 
-    min_sdk_version: "31",
+    min_sdk_version: "29",
     target: {
+        android: {
+            static_libs: [
+                // On Android 10 (sdk version 29), libc.so doesn't export libunwind symbols.
+                "libunwind",
+            ],
+        },
         android_arm: {
             dist: {
                 dir: "simpleperf/android/arm",
@@ -770,6 +776,13 @@ cc_fuzz {
     },
     dictionary: "simpleperf_dict.dict",
     corpus: ["testdata/**/*.data"],
+    fuzz_config: {
+        vector: "local_with_developer_options",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+    },
+    native_coverage: false,
 }
 
 cc_fuzz {
@@ -797,6 +810,13 @@ cc_fuzz {
             enabled: false,
         },
     },
+    fuzz_config: {
+        vector: "local_with_developer_options",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+    },
+    native_coverage: false,
 }
 
 genrule {
