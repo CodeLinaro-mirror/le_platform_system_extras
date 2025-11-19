@@ -63,7 +63,7 @@ class ETMRecorder {
   bool IsETMDriverAvailable();
   // If need_etr is true, then return true only if ETR is ready.
   // Otherwise, return true if either ETR or TRBE is ready.
-  android::base::expected<bool, std::string> CheckEtmSupport(bool need_etr = true);
+  android::base::expected<bool, std::string> CheckEtmSupport(bool need_etr = false);
   bool SetEtmPerfEventAttr(const EventType& event_type, perf_event_attr& attr);
   AuxTraceInfoRecord CreateAuxTraceInfoRecord();
   size_t GetAddrFilterPairs();
@@ -72,10 +72,9 @@ class ETMRecorder {
   void SetCycleThreshold(size_t threshold);
   bool IsUsingTRBE(const perf_event_attr& attr, int cpu) const;
   const std::set<int>& GetCPUsHavingTRBESink() const { return trbe_supported_cpus_; }
-  std::vector<std::string> GetETRSinks() const {
-    auto key_view = std::views::keys(etr_sink_configs_);
-    return std::vector<std::string>(key_view.begin(), key_view.end());
-  }
+
+  const std::map<std::string, uint32_t> GetETRSinksForTesting() const { return etr_sink_configs_; }
+  void SetTRBESinkForTesting(bool has_trbe_sink) { this->has_trbe_sink = has_trbe_sink; }
 
  private:
   bool ReadEtmInfo();
