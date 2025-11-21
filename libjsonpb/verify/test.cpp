@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include <limits>
-
-#include <sstream>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -27,7 +28,6 @@
 #include "test.pb.h"
 
 using ::android::jsonpb::internal::FormatJson;
-using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 
 namespace android {
@@ -41,7 +41,7 @@ class JsonKeyTest : public LibJsonpbVerifyTest {
  public:
   template <typename T>
   std::string GetFieldJsonName(const std::string& field_name) {
-    return T{}.GetDescriptor()->FindFieldByName(field_name)->json_name();
+    return std::string(T{}.GetDescriptor()->FindFieldByName(field_name)->json_name());
   }
 
   template <typename T>
