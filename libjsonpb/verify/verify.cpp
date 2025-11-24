@@ -21,9 +21,9 @@
 #include <sstream>
 #include <string>
 
+#include <absl/strings/str_cat.h>
 #include <android-base/strings.h>
 #include <google/protobuf/descriptor.h>
-#include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/reflection.h>
 #include <json/reader.h>
@@ -34,19 +34,15 @@ namespace android {
 namespace jsonpb {
 
 using google::protobuf::FieldDescriptor;
-using google::protobuf::FieldDescriptorProto;
 using google::protobuf::Message;
 
 // Return json_name of the field. If it is not set, return the name of the
 // field.
-const std::string& GetJsonName(const FieldDescriptor& field_descriptor) {
-  // The current version of libprotobuf does not define
-  // FieldDescriptor::has_json_name() yet. Use a workaround.
-  // TODO: use field_descriptor.has_json_name() when libprotobuf version is
-  // bumped.
-  FieldDescriptorProto proto;
-  field_descriptor.CopyTo(&proto);
-  return proto.has_json_name() ? field_descriptor.json_name() : field_descriptor.name();
+std::string GetJsonName(const FieldDescriptor& field_descriptor) {
+  if (field_descriptor.has_json_name()) {
+    return std::string(field_descriptor.json_name());
+  }
+  return std::string(field_descriptor.name());
 }
 
 bool AllFieldsAreKnown(const Message& message, const Json::Value& json,
@@ -91,7 +87,7 @@ bool AllFieldsAreKnown(const Message& message, const Json::Value& json,
       continue;
     }
 
-    const std::string& json_name = GetJsonName(*field_descriptor);
+    std::string json_name = GetJsonName(*field_descriptor);
     const Json::Value& json_value = json[json_name];
 
     if (field_descriptor->is_repeated()) {
@@ -112,7 +108,7 @@ bool AllFieldsAreKnown(const Message& message, const Json::Value& json,
 
       std::unique_ptr<Message> scratch_space(fields.NewMessage());
       for (int i = 0; i < fields.size(); ++i) {
-        path->push_back(json_name + "[" + std::to_string(i) + "]");
+        path->push_back(absl::StrCat(json_name, "[", i, "]"));
         auto res =
             AllFieldsAreKnown(fields.Get(i, scratch_space.get()), json_value[i], path, error);
         path->pop_back();
