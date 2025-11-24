@@ -66,9 +66,11 @@ cc_binary_host {
     sanitize: {
         misc_undefined: ["integer"],
     },
+    shared_libs: [
+        "libfec_rs",
+    ],
     static_libs: [
         "libfec",
-        "libfec_rs",
         "libavb",
         "libcrypto_utils",
         "libcrypto",
