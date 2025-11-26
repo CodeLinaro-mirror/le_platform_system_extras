@@ -16,6 +16,7 @@
 
 #include <jsonpb/jsonpb.h>
 
+#include <absl/strings/str_cat.h>
 #include <android-base/logging.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
@@ -33,7 +34,7 @@ using google::protobuf::util::TypeResolver;
 static constexpr char kTypeUrlPrefix[] = "type.googleapis.com";
 
 std::string GetTypeUrl(const Message& message) {
-  return std::string(kTypeUrlPrefix) + "/" + message.GetDescriptor()->full_name();
+  return absl::StrCat(kTypeUrlPrefix, "/", message.GetDescriptor()->full_name());
 }
 
 ErrorOr<std::string> MessageToJsonString(const Message& message) {
