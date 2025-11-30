@@ -231,17 +231,25 @@ bool ETMRecorder::SetEtmPerfEventAttr(const EventType& event_type, perf_event_at
   CHECK(etm_supported_);
   BuildEtmConfig();
   attr.config = etm_event_config_;
-  if (has_trbe_sink && event_type.name.find("etr") == std::string::npos) {
-    // When TRBE is present and user doesn't explicitly choose ETR, let the driver choose the most
-    // suitable configuration.
-    attr.config2 = 0;
-  } else {
-    auto it = etr_sink_configs_.find(ExtractETRName(event_type.name));
+  std::string etr_name = ExtractETRName(event_type.name);
+  if (!etr_name.empty()) {
+    // User explicitly chooses an ETR.
+    auto it = etr_sink_configs_.find(etr_name);
     if (it == etr_sink_configs_.end()) {
       LOG(ERROR) << "Unable to find etr sink for " << event_type.name;
       return false;
     }
     attr.config2 = it->second;
+  } else {
+    // User doesn't explicitly choose an ETR.
+    if (has_trbe_sink) {
+      // Prefer using TRBE if it is available.
+      attr.config2 = 0;
+    } else {
+      // Use the first ETR sink.
+      CHECK(!etr_sink_configs_.empty());
+      attr.config2 = etr_sink_configs_.begin()->second;
+    }
   }
   attr.config3 = cc_threshold_config_;
   return true;

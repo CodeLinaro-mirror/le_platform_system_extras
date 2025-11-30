@@ -33,14 +33,33 @@ TEST(ETMRecorder, etr_sinks) {
 
   std::set<EventType> event_types;
   recorder.BuildEventTypes(event_types);
-  for (const auto& etr_name : recorder.GetETRSinks()) {
-    // Recording via an ETR sink can fail if no ETE/ETM connects to it. So only do userspace checks.
+  auto get_event_type = [&](const std::string event_name) -> const EventType& {
     auto it =
-        std::find_if(event_types.begin(), event_types.end(), [&](const EventType& event_type) {
-          return android::base::EndsWith(event_type.name, "/@" + etr_name + "/");
-        });
-    ASSERT_TRUE(it != event_types.end());
-    perf_event_attr attr;
-    ASSERT_TRUE(recorder.SetEtmPerfEventAttr(*it, attr));
+        std::find_if(event_types.begin(), event_types.end(),
+                     [&](const EventType& event_type) { return event_type.name == event_name; });
+    CHECK(it != event_types.end());
+    return *it;
+  };
+
+  // Record with TRBE sink.
+  bool saved_trbe_sink = !recorder.GetCPUsHavingTRBESink().empty();
+  recorder.SetTRBESinkForTesting(true);
+  perf_event_attr attr;
+  ASSERT_TRUE(recorder.SetEtmPerfEventAttr(get_event_type("cs-etm"), attr));
+  ASSERT_EQ(attr.config2, 0);
+
+  const std::map<std::string, uint32_t> etr_sinks = recorder.GetETRSinksForTesting();
+  if (!etr_sinks.empty()) {
+    recorder.SetTRBESinkForTesting(false);
+    // Record with default ETR sink.
+    ASSERT_TRUE(recorder.SetEtmPerfEventAttr(get_event_type("cs-etm"), attr));
+    ASSERT_EQ(attr.config2, etr_sinks.begin()->second);
+    // Record with ETR sink name. Recording via an ETR sink can fail if no ETE/ETM connects to it.
+    // So only do userspace checks.
+    for (const auto& [etr_name, etr_config] : etr_sinks) {
+      ASSERT_TRUE(recorder.SetEtmPerfEventAttr(get_event_type("cs-etm/@" + etr_name + "/"), attr));
+      ASSERT_EQ(attr.config2, etr_config);
+    }
   }
+  recorder.SetTRBESinkForTesting(saved_trbe_sink);
 }
