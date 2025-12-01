@@ -126,6 +126,7 @@ enum {
   kAndroidVersionT = 13,
   kAndroidVersionU = 14,
   kAndroidVersionV = 15,
+  kAndroidVersion16 = 16,
 };
 
 // Return 0 if no android version.

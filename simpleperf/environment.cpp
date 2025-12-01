@@ -819,20 +819,37 @@ bool RunInAppContext(const std::string& app_package_name, const std::string& cmd
   if (app_type == "unknown" && IsAppDebuggable(user_id, app_package_name)) {
     app_type = "debuggable";
   }
-  if (allow_simpleperf_app_runner) {
-    if (app_type == "debuggable" || app_type == "profileable" || app_type == "unknown") {
+
+  auto try_simpleperf_app_runner = [&]() {
+    if (!in_app_runner && allow_simpleperf_app_runner &&
+        (app_type == "debuggable" || app_type == "profileable" || app_type == "unknown")) {
       in_app_runner.reset(new SimpleperfAppRunner(user_id, app_package_name, app_type));
       if (!in_app_runner->Prepare()) {
         in_app_runner = nullptr;
       }
     }
-  }
-  if (!in_app_runner && allow_run_as && app_type == "debuggable") {
-    in_app_runner.reset(new RunAs(user_id, app_package_name));
-    if (!in_app_runner->Prepare()) {
-      in_app_runner = nullptr;
+  };
+  auto try_run_as_runner = [&]() {
+    if (!in_app_runner && allow_run_as && app_type == "debuggable") {
+      in_app_runner.reset(new RunAs(user_id, app_package_name));
+      if (!in_app_runner->Prepare()) {
+        in_app_runner = nullptr;
+      }
     }
+  };
+
+  // Before Android 16, we prefer using run-as, which can use the latest sideloaded simpleperf.
+  // After Android 16, sideloaded simpleperf has no permission to get kernel samples. So prefer
+  // using simpleperf_app_runner to run simpleperf shipped on device.
+  bool prefer_simpleperf_app_runner = GetAndroidVersion() >= kAndroidVersion16;
+  if (prefer_simpleperf_app_runner) {
+    try_simpleperf_app_runner();
+    try_run_as_runner();
+  } else {
+    try_run_as_runner();
+    try_simpleperf_app_runner();
   }
+
   if (!in_app_runner) {
     LOG(ERROR) << "Package " << app_package_name
                << " doesn't exist or isn't debuggable/profileable.";
@@ -929,6 +946,8 @@ int GetAndroidVersion() {
         // Each Android version has a version number: L is 5, M is 6, N is 7, O is 8, etc.
         if (s[0] >= 'L' && s[0] <= 'V') {
           android_version = s[0] - 'P' + kAndroidVersionP;
+        } else if (s[0] == 'B') {
+          android_version = kAndroidVersion16;
         } else if (isdigit(s[0])) {
           sscanf(s.c_str(), "%d", &android_version);
         }
@@ -945,9 +964,14 @@ int GetAndroidVersion() {
     if (android_version == 0) {
       s = android::base::GetProperty("ro.build.version.sdk", "");
       int sdk_version = 0;
-      const int SDK_VERSION_V = 35;
-      if (sscanf(s.c_str(), "%d", &sdk_version) == 1 && sdk_version >= SDK_VERSION_V) {
-        android_version = kAndroidVersionV;
+      if (sscanf(s.c_str(), "%d", &sdk_version) == 1) {
+        const int SDK_VERSION_V = 35;
+        const int SDK_VERSION_16 = 36;
+        if (sdk_version == SDK_VERSION_V) {
+          android_version = kAndroidVersionV;
+        } else if (sdk_version >= SDK_VERSION_16) {
+          android_version = kAndroidVersion16;
+        }
       }
     }
   }

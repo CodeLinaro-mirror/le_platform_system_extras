@@ -1185,6 +1185,7 @@ class ReportLibOptions:
     proguard_mapping_files: List[str]
     sample_filters: List[str]
     aggregate_threads: List[str]
+    no_demangle: bool
 
 
 class BaseArgumentParser(argparse.ArgumentParser):
@@ -1222,6 +1223,8 @@ class BaseArgumentParser(argparse.ArgumentParser):
             help="""Aggregate threads with names matching the same regex. As a result, samples from
                     different threads (like a thread pool) can be shown in one flamegraph.
                 """)
+        parser.add_argument('--no-demangle', action='store_true', help="""
+                Don't demangle symbol names""")
 
     def _add_sample_filter_options(
             self, group: Optional[Any] = None, with_pid_shortcut: bool = True):
@@ -1308,7 +1311,8 @@ class BaseArgumentParser(argparse.ArgumentParser):
             sample_filters = self._build_sample_filter(namespace)
             report_lib_options = ReportLibOptions(
                 namespace.show_art_frames, namespace.remove_method, namespace.trace_offcpu,
-                namespace.proguard_mapping_file, sample_filters, namespace.aggregate_threads)
+                namespace.proguard_mapping_file, sample_filters, namespace.aggregate_threads,
+                namespace.no_demangle)
             setattr(namespace, 'report_lib_options', report_lib_options)
 
         if not Log.initialized:

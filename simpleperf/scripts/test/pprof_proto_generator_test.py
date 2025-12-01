@@ -222,7 +222,7 @@ class TestPprofProtoGenerator(TestBase):
 
         # Read recording file.
         config = {'ndk_path': TestHelper.ndk_path, 'max_chain_length': 1000000,
-                  'report_lib_options': ReportLibOptions(False, None, '', None, None, None),
+                  'report_lib_options': ReportLibOptions(False, None, '', None, None, None, False),
                   'show_event_counters': False}
         generator = PprofProfileGenerator(config)
         generator.load_record_file(testdata_file)
@@ -358,7 +358,7 @@ class TestPprofProtoGenerator(TestBase):
         self.assertIsNone(ToolFinder.find_tool_path('llvm-readelf', TestHelper.ndk_path))
         # Step 2. Run PprofProfileGenerator.
         config = {'ndk_path': TestHelper.ndk_path, 'max_chain_length': 1000000,
-                  'report_lib_options': ReportLibOptions(False, None, '', None, None, None),
+                  'report_lib_options': ReportLibOptions(False, None, '', None, None, None, False),
                   'show_event_counters': False}
         generator = PprofProfileGenerator(config)
         testdata_file = TestHelper.testdata_path('perf_with_interpreter_frames.data')
@@ -366,3 +366,7 @@ class TestPprofProtoGenerator(TestBase):
         self.assertIsNotNone(generator.gen(1))
         # Step 3. Restore tools.
         ToolFinder.EXPECTED_TOOLS = saved_tools
+
+    def test_no_demangle(self):
+        output = self.run_generator(['--no-demangle'])
+        self.assertIn('name: _ZN7android14IPCThreadState14talkWithDriverEb', output)
