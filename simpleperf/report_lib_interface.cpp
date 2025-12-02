@@ -245,6 +245,7 @@ class ReportLib {
   bool SetTraceOffCpuMode(const char* mode);
   bool SetSampleFilter(const char** filters, int filters_len);
   bool AggregateThreads(const char** thread_name_regex, int thread_name_regex_len);
+  void DisableDemangle() { demangle_ = false; }
 
   Sample* GetNextSample();
   Event* GetEventOfCurrentSample() { return &current_event_; }
@@ -321,6 +322,7 @@ class ReportLib {
   std::string filepath_;
   std::string comm_;
   std::vector<SymbolEntry> symbols_;
+  bool demangle_ = true;
 };
 
 bool ReportLib::SetLogSeverity(const char* log_level) {
@@ -614,7 +616,8 @@ bool ReportLib::SetCurrentSample(std::unique_ptr<SampleRecord> sample_record) {
       entry.symbol.dso_name = report_entry.dso->GetReportPath().data();
     }
     entry.symbol.vaddr_in_file = report_entry.vaddr_in_file;
-    entry.symbol.symbol_name = report_entry.symbol->DemangledName();
+    entry.symbol.symbol_name =
+        demangle_ ? report_entry.symbol->DemangledName() : report_entry.symbol->Name();
     entry.symbol.symbol_addr = report_entry.symbol->addr;
     entry.symbol.symbol_len = report_entry.symbol->len;
     entry.symbol.mapping = AddMapping(*report_entry.map);
@@ -798,7 +801,8 @@ SymbolEntry* ReportLib::ReadSymbolsForPath(const char* path) {
   symbols_.clear();
   symbols_.reserve(symbols.size() + 1);
   for (auto& symbol : symbols) {
-    symbols_.emplace_back(nullptr, 0, symbol.DemangledName(), symbol.addr, symbol.len, nullptr);
+    symbols_.emplace_back(nullptr, 0, demangle_ ? symbol.DemangledName() : symbol.Name(),
+                          symbol.addr, symbol.len, nullptr);
   }
   symbols_.emplace_back(nullptr, 0, nullptr, 0, 0, nullptr);
   return symbols_.data();
@@ -833,6 +837,7 @@ bool SetTraceOffCpuMode(ReportLib* report_lib, const char* mode) EXPORT;
 bool SetSampleFilter(ReportLib* report_lib, const char** filters, int filters_len) EXPORT;
 bool AggregateThreads(ReportLib* report_lib, const char** thread_name_regex,
                       int thread_name_regex_len) EXPORT;
+void DisableDemangle(ReportLib* report_lib) EXPORT;
 
 Sample* GetNextSample(ReportLib* report_lib) EXPORT;
 Event* GetEventOfCurrentSample(ReportLib* report_lib) EXPORT;
@@ -913,6 +918,10 @@ bool SetSampleFilter(ReportLib* report_lib, const char** filters, int filters_le
 bool AggregateThreads(ReportLib* report_lib, const char** thread_name_regex,
                       int thread_name_regex_len) {
   return report_lib->AggregateThreads(thread_name_regex, thread_name_regex_len);
+}
+
+void DisableDemangle(ReportLib* report_lib) {
+  report_lib->DisableDemangle();
 }
 
 Sample* GetNextSample(ReportLib* report_lib) {
