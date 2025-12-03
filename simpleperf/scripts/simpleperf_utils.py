@@ -868,7 +868,8 @@ class Objdump(object):
             raw_output = subprocess.check_output([objdump_path, '-d', '--demangle', real_path])
             output = bytes_to_str(raw_output)
             for line in output.split('\n'):
-                match = re.match(r'^\s*([0-9A-Fa-f]+):', line)
+                # Exclude C:\ on Windows.
+                match = re.match(r'^\s*([0-9A-Fa-f]+):[^\\]', line)
                 if not match:
                     continue
                 addr = int(match.group(1), 16)
