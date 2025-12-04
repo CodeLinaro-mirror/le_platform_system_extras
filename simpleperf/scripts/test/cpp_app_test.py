@@ -162,7 +162,7 @@ class TestExampleCppJniCall(TestExampleBase):
         self.check_exist(dirname="annotated_files")
         self.check_file_under_dir("annotated_files", "native-lib.cpp")
         summary_file = os.path.join("annotated_files", "summary")
-        self.check_annotation_summary(summary_file, [("native-lib.cpp", 5, 0), ("line 35", 5, 0)])
+        self.check_annotation_summary(summary_file, [("native-lib.cpp", 5, 0), ("line 39", 5, 0)])
         if self.use_compiled_java_code:
             self.check_file_under_dir("annotated_files", "MixActivity.java")
             self.check_annotation_summary(summary_file, [
