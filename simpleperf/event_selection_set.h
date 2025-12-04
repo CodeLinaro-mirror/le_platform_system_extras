@@ -25,6 +25,7 @@
 
 #include <android-base/macros.h>
 
+#include "AddrFilter.h"
 #include "IOEventLoop.h"
 #include "RecordReadThread.h"
 #include "event_attr.h"
@@ -64,25 +65,6 @@ struct SampleRate {
     CHECK_NE(sample_freq != 0u, sample_period != 0u);
     return sample_freq != 0u;
   }
-};
-
-struct AddrFilter {
-  enum Type {
-    FILE_RANGE,
-    FILE_START,
-    FILE_STOP,
-    KERNEL_RANGE,
-    KERNEL_START,
-    KERNEL_STOP,
-  } type;
-  uint64_t addr;
-  uint64_t size;
-  std::string file_path;
-
-  AddrFilter(AddrFilter::Type type, uint64_t addr, uint64_t size, const std::string& file_path)
-      : type(type), addr(addr), size(size), file_path(file_path) {}
-
-  std::string ToString() const;
 };
 
 // EventSelectionSet helps to monitor events. It is used in following steps:

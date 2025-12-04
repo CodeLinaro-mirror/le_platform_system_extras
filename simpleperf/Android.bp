@@ -129,6 +129,7 @@ cc_defaults {
     defaults: [
         "libsimpleperf_readelf_defaults",
         "simpleperf_cflags",
+        "rust_static_std",
     ],
     host_supported: true,
     static_libs: [
@@ -171,6 +172,7 @@ cc_defaults {
     defaults: [
         "simpleperf_cflags",
         "libsimpleperf_readelf_defaults",
+        "rust_static_std",
     ],
     host_supported: true,
     shared_libs: [
@@ -265,6 +267,7 @@ cc_defaults {
         },
         linux: {
             srcs: [
+                "AddrFilter.cpp",
                 "CallChainJoiner.cpp",
                 "cmd_api.cpp",
                 "cmd_debug_unwind.cpp",
@@ -613,6 +616,7 @@ cc_defaults {
                 "cmd_record_test.cpp",
             ],
             srcs: [
+                "AddrFilter_test.cpp",
                 "CallChainJoiner_test.cpp",
                 "cmd_api_test.cpp",
                 "cmd_debug_unwind_test.cpp",

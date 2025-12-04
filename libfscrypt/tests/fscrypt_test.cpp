@@ -211,7 +211,7 @@ TEST(fscrypt, ComparePolicies) {
     foo_options.contents_mode = 1;
     foo_options.filenames_mode = 1;
     foo_options.flags = 1;
-    foo_options.use_hw_wrapped_key = true;
+    foo_options.key_type = KeyType::kHwWrappedV0;
     foo_options.dusize_4k = true;
     foo.options = foo_options;
     EXPECT_EQ(foo, foo);
@@ -220,6 +220,6 @@ TEST(fscrypt, ComparePolicies) {
     TEST_INEQUALITY(foo, options.contents_mode, -1);
     TEST_INEQUALITY(foo, options.filenames_mode, 3);
     TEST_INEQUALITY(foo, options.flags, 0);
-    TEST_INEQUALITY(foo, options.use_hw_wrapped_key, false);
+    TEST_INEQUALITY(foo, options.key_type, KeyType::kRaw);
     TEST_INEQUALITY(foo, options.dusize_4k, false);
 }
