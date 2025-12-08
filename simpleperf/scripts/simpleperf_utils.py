@@ -29,6 +29,7 @@ import os.path
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -82,7 +83,7 @@ def get_target_binary_path(arch: str, binary_name: str) -> str:
     return binary_path
 
 
-def get_host_binary_path(binary_name: str) -> str:
+def get_host_binary_path(binary_name: str, check: bool = True) -> Optional[str]:
     in_dir_path = Path('bin')
     if is_windows():
         if binary_name.endswith('.so'):
@@ -105,8 +106,12 @@ def get_host_binary_path(binary_name: str) -> str:
     # the bin directory is put in sys.path[0].
     path2 = Path(sys.path[0]) / in_dir_path
     if path2.is_file():
+        if not os.access(path2, os.X_OK):
+            path2.chmod(path2.stat().st_mode | stat.S_IXUSR)
         return str(path2)
-    log_fatal(f"can't find binary: {path1}")
+    if check:
+        log_fatal(f"can't find binary: {path1}")
+    return None
 
 
 def is_executable_available(executable: str, option='--help') -> bool:
@@ -130,27 +135,22 @@ class ToolFinder:
 
     EXPECTED_TOOLS = {
         'adb': {
-            'is_binutils': False,
             'test_option': 'version',
             'path_in_sdk': 'platform-tools/adb',
         },
         'llvm-objdump': {
-            'is_binutils': False,
             'path_in_ndk':
                 lambda platform: 'toolchains/llvm/prebuilt/%s-x86_64/bin/llvm-objdump' % platform,
         },
         'llvm-readelf': {
-            'is_binutils': False,
             'path_in_ndk':
                 lambda platform: 'toolchains/llvm/prebuilt/%s-x86_64/bin/llvm-readelf' % platform,
         },
         'llvm-symbolizer': {
-            'is_binutils': False,
             'path_in_ndk':
                 lambda platform: 'toolchains/llvm/prebuilt/%s-x86_64/bin/llvm-symbolizer' % platform,
         },
         'llvm-strip': {
-            'is_binutils': False,
             'path_in_ndk':
                 lambda platform: 'toolchains/llvm/prebuilt/%s-x86_64/bin/llvm-strip' % platform,
         },
@@ -199,55 +199,33 @@ class ToolFinder:
         return None
 
     @classmethod
-    def _get_binutils_path_in_ndk(cls, toolname: str, arch: Optional[str], platform: str
-                                  ) -> Tuple[str, str]:
-        if not arch:
-            arch = 'arm64'
-        if arch == 'arm64':
-            name = 'aarch64-linux-android-' + toolname
-        elif arch == 'arm':
-            name = 'arm-linux-androideabi-' + toolname
-        elif arch == 'x86_64':
-            name = 'x86_64-linux-android-' + toolname
-        elif arch == 'x86':
-            name = 'i686-linux-android-' + toolname
-        else:
-            log_fatal('unexpected arch %s' % arch)
-        path = 'toolchains/llvm/prebuilt/%s-x86_64/bin/%s' % (platform, name)
-        return (name, path)
-
-    @classmethod
-    def find_tool_path(cls, toolname: str, ndk_path: Optional[str] = None,
-                       arch: Optional[str] = None) -> Optional[str]:
+    def find_tool_path(cls, toolname: str, ndk_path: Optional[str] = None) -> Optional[str]:
         tool_info = cls.EXPECTED_TOOLS.get(toolname)
         if not tool_info:
             return None
 
-        is_binutils = tool_info['is_binutils']
         test_option = tool_info.get('test_option', '--help')
         platform = get_platform()
 
-        # Find tool in clang prebuilts in Android platform.
-        if toolname.startswith('llvm-') and platform == 'linux' and get_script_dir().endswith(
-                'system/extras/simpleperf/scripts'):
-            path = str(
-                Path(get_script_dir()).parents[3] / 'prebuilts' / 'clang' / 'host' / 'linux-x86' /
-                'llvm-binutils-stable' / toolname)
-            if is_executable_available(path, test_option):
+        if toolname.startswith('llvm-') and platform == 'linux':
+            # Search for the tool in the Android platform clang prebuilts directory.
+            if get_script_dir().endswith('system/extras/simpleperf/scripts'):
+                path = str(Path(get_script_dir()).parents[3] / 'prebuilts' / 'clang' / 'host' /
+                           'linux-x86' / 'llvm-binutils-stable' / toolname)
+                if is_executable_available(path, test_option):
+                    return path
+            # Search for the tool in the host binary directory. It works for python host binaries
+            # built with llvm binutils.
+            if path := get_host_binary_path(toolname):
                 return path
 
-        # Find tool in NDK or SDK.
+        # Search for the tool in Android NDK and SDK.
         path_in_ndk = None
         path_in_sdk = None
-        if is_binutils:
-            toolname_with_arch, path_in_ndk = cls._get_binutils_path_in_ndk(
-                toolname, arch, platform)
-        else:
-            toolname_with_arch = toolname
-            if 'path_in_ndk' in tool_info:
-                path_in_ndk = tool_info['path_in_ndk'](platform)
-            elif 'path_in_sdk' in tool_info:
-                path_in_sdk = tool_info['path_in_sdk']
+        if 'path_in_ndk' in tool_info:
+            path_in_ndk = tool_info['path_in_ndk'](platform)
+        elif 'path_in_sdk' in tool_info:
+            path_in_sdk = tool_info['path_in_sdk']
         if path_in_ndk:
             path_in_ndk = path_in_ndk.replace('/', os.sep)
         elif path_in_sdk:
@@ -263,14 +241,9 @@ class ToolFinder:
                 if is_executable_available(path, test_option):
                     return path
 
-        # Find tool in $PATH.
-        if is_executable_available(toolname_with_arch, test_option):
-            return toolname_with_arch
-
-        # Find tool without arch in $PATH.
-        if is_binutils and tool_info.get('accept_tool_without_arch'):
-            if is_executable_available(toolname, test_option):
-                return toolname
+        # Search for the tool in $PATH.
+        if is_executable_available(toolname, test_option):
+            return toolname
         return None
 
 
@@ -839,7 +812,7 @@ class Objdump(object):
     def _objdump_path(self, arch):
         objdump_path = self.objdump_paths.get(arch)
         if not objdump_path:
-            objdump_path = ToolFinder.find_tool_path('llvm-objdump', self.ndk_path, arch)
+            objdump_path = ToolFinder.find_tool_path('llvm-objdump', self.ndk_path)
             if not objdump_path:
                 log_exit("Can't find llvm-objdump." + NDK_ERROR_MESSAGE)
             self.objdump_paths[arch] = objdump_path
