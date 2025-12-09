@@ -151,9 +151,13 @@ cc_defaults {
             static_libs: [
                 "libunwindstack",
                 "libcutils",
+                "libdexfile_support",
                 "libprocinfo",
                 "libevent",
                 "librustc_demangle_static",
+            ],
+            runtime_libs: [
+                "libdexfile", // libdexfile_support dependency
             ],
         },
         windows: {
@@ -312,13 +316,6 @@ cc_library_static {
         "libbuildversion",
     ],
     use_version_lib: false,
-
-    target: {
-        linux: {
-            static_libs: ["libdexfile_support"],
-            runtime_libs: ["libdexfile"], // libdexfile_support dependency
-        },
-    },
 }
 
 // simpleperf shipped in system image
@@ -449,10 +446,6 @@ cc_binary {
                 dir: "simpleperf/darwin/x86_64",
             },
         },
-        linux: {
-            static_libs: ["libdexfile_support"],
-            runtime_libs: ["libdexfile"], // libdexfile_support dependency
-        },
         linux_glibc_x86: {
             dist: {
                 dir: "simpleperf/linux/x86",
@@ -503,10 +496,6 @@ cc_library {
     target: {
         darwin: {
             enabled: false,
-        },
-        linux: {
-            static_libs: ["libdexfile_support"],
-            runtime_libs: ["libdexfile"], // libdexfile_support dependency
         },
         windows: {
             enabled: false,
@@ -658,7 +647,7 @@ cc_test {
     name: "simpleperf_unit_test",
     defaults: [
         "simpleperf_test_srcs",
-        "simpleperf_shared_libs",
+        "simpleperf_static_libs",
     ],
     static_libs: [
         "libgmock",
