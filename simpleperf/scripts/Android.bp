@@ -23,6 +23,24 @@ package {
     default_applicable_licenses: ["system_extras_simpleperf_license"],
 }
 
+genrule {
+    name: "simpleperf_linux_x86_64_binutils",
+    tools: [
+        "llvm-objdump",
+        "llvm-readobj",
+        "llvm-symbolizer",
+    ],
+    out: [
+        "bin/linux/x86_64/llvm-objdump",
+        "bin/linux/x86_64/llvm-readelf",
+        "bin/linux/x86_64/llvm-symbolizer",
+    ],
+    cmd: "mkdir -p $(genDir)/bin/linux/x86_64 && " +
+        "cp $(location llvm-objdump) $(genDir)/bin/linux/x86_64 && " +
+        "cp $(location llvm-readobj) $(genDir)/bin/linux/x86_64/llvm-readelf && " +
+        "cp $(location llvm-symbolizer) $(genDir)/bin/linux/x86_64",
+}
+
 python_library_host {
     name: "simpleperf_report_lib",
     srcs: [
@@ -35,6 +53,7 @@ python_library_host {
         "bin/darwin/x86_64/libsimpleperf_report.dylib",
         "bin/linux/x86_64/libsimpleperf_report.so",
         "bin/windows/**/*.dll",
+        ":simpleperf_linux_x86_64_binutils",
     ],
 }
 
@@ -56,6 +75,17 @@ python_binary_host {
     name: "pprof_proto_generator",
     srcs: [
         "pprof_proto_generator.py",
+    ],
+    libs: [
+        "profile_py_pb2",
+        "simpleperf_report_lib",
+    ],
+}
+
+python_binary_host {
+    name: "binary_cache_builder",
+    srcs: [
+        "binary_cache_builder.py",
     ],
     libs: [
         "profile_py_pb2",
