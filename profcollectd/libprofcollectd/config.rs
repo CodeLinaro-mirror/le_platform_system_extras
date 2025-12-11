@@ -32,7 +32,7 @@ const PROFCOLLECT_CONFIG_NAMESPACE: &str = "profcollect_native_boot";
 const PROFCOLLECT_NODE_ID_PROPERTY: &str = "persist.profcollectd.node_id";
 
 const DEFAULT_BINARY_FILTER: &str = "(^/(system|apex/.+|vendor)/(bin|lib64)/.+)|\
-    (^/data/app/.+\\.so$)|kernel.kallsyms";
+    (^/data/app/.+\\.so$)|kernel.kallsyms|(^/system/framework/arm64/.+\\.oat$)";
 pub const REPORT_RETENTION_SECS: u64 = 14 * 24 * 60 * 60; // 14 days.
 
 // Static configs that cannot be changed.
