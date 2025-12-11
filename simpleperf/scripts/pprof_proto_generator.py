@@ -360,6 +360,9 @@ class PprofProfileGenerator(object):
             sample.labels.append(Label(
                 self.get_string_id("tid"),
                 self.get_string_id(str(report_sample.tid))))
+            sample.labels.append(Label(
+                self.get_string_id("cpu"),
+                self.get_string_id(str(report_sample.cpu))))
             if self._filter_symbol(symbol):
                 location_id = self.get_location_id(report_sample.ip, symbol)
                 sample.add_location_id(location_id)
