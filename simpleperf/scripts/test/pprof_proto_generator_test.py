@@ -54,7 +54,7 @@ class TestPprofProtoGenerator(TestBase):
         self.assertIn(key, self.run_generator(['--pid', '10419', '10416']))
         self.assertNotIn(key, self.run_generator(['--pid', '10416']))
 
-    def test_thread_labels(self):
+    def test_labels(self):
         output = self.run_generator()
         self.assertIn('label[0] = thread:Binder:10419_1', output)
         self.assertIn('label[0] = thread:Binder:10419_2', output)
@@ -63,6 +63,7 @@ class TestPprofProtoGenerator(TestBase):
         self.assertIn('label[1] = threadpool:Binder:%d_%d', output)
         self.assertIn('label[2] = pid:10419', output)
         self.assertIn('label[3] = tid:10459', output)
+        self.assertIn('label[4] = cpu:2', output)
 
     def test_tid_filter(self):
         key1 = 'art::ProfileSaver::Run()'  # function in thread 10459
