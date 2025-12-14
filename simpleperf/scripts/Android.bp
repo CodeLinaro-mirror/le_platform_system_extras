@@ -23,7 +23,7 @@ package {
     default_applicable_licenses: ["system_extras_simpleperf_license"],
 }
 
-genrule {
+cc_genrule {
     name: "simpleperf_linux_x86_64_binutils",
     tools: [
         "llvm-objdump",
@@ -39,6 +39,16 @@ genrule {
         "cp $(location llvm-objdump) $(genDir)/bin/linux/x86_64 && " +
         "cp $(location llvm-readobj) $(genDir)/bin/linux/x86_64/llvm-readelf && " +
         "cp $(location llvm-symbolizer) $(genDir)/bin/linux/x86_64",
+
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+        windows: {
+            enabled: false,
+        },
+    },
 }
 
 python_library_host {
@@ -53,8 +63,14 @@ python_library_host {
         "bin/darwin/x86_64/libsimpleperf_report.dylib",
         "bin/linux/x86_64/libsimpleperf_report.so",
         "bin/windows/**/*.dll",
-        ":simpleperf_linux_x86_64_binutils",
     ],
+    target: {
+        linux: {
+            data: [
+                ":simpleperf_linux_x86_64_binutils",
+            ],
+        },
+    },
 }
 
 python_library_host {
