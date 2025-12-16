@@ -743,9 +743,25 @@ filegroup {
     srcs: ["CtsSimpleperfTestCases_testdata/**/*"],
 }
 
+cc_defaults {
+    name: "simpleperf_fuzzer_defaults",
+    fuzz_config: {
+        vector: "local_with_developer_options",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+
+        triage_assignee: "yabinc@google.com",
+        componentid: 1284821,
+        cc: ["android-llvm-dev@google.com"],
+    },
+    native_coverage: false,
+}
+
 cc_fuzz {
     name: "libsimpleperf_report_fuzzer",
     defaults: [
+        "simpleperf_fuzzer_defaults",
         "simpleperf_static_libs",
         "libdexfile_static_transitive_defaults",
     ],
@@ -770,18 +786,12 @@ cc_fuzz {
     },
     dictionary: "simpleperf_dict.dict",
     corpus: ["testdata/**/*.data"],
-    fuzz_config: {
-        vector: "local_with_developer_options",
-        service_privilege: "privileged",
-        users: "multi_user",
-        fuzzed_code_usage: "shipped",
-    },
-    native_coverage: false,
 }
 
 cc_fuzz {
     name: "simpleperf_writer_fuzzer",
     defaults: [
+        "simpleperf_fuzzer_defaults",
         "simpleperf_static_libs",
         "libdexfile_static_transitive_defaults",
     ],
@@ -804,13 +814,6 @@ cc_fuzz {
             enabled: false,
         },
     },
-    fuzz_config: {
-        vector: "local_with_developer_options",
-        service_privilege: "privileged",
-        users: "multi_user",
-        fuzzed_code_usage: "shipped",
-    },
-    native_coverage: false,
 }
 
 genrule {
