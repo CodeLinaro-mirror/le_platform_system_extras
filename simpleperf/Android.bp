@@ -657,6 +657,11 @@ cc_test {
         android: {
             test_suites: ["device-tests"],
         },
+        darwin: {
+            host_ldlibs: [
+                "-framework CoreFoundation",
+            ],
+        },
     },
     data: [
         "testdata/**/*",
