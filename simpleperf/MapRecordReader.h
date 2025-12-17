@@ -63,9 +63,19 @@ class MapRecordThread {
   bool ReadMapRecords(const std::function<void(const Record*)>& callback, bool only_kernel_maps);
 
  private:
+  using MapRecordLocation = std::pair<uint64_t, uint64_t>;  // a pair of file offset and size
+
+  struct MapRecordStat {
+    uint64_t current_offset = 0;
+    std::vector<char> record_buffer;
+    MapRecordLocation kernel_location;
+    std::map<int, MapRecordLocation> process_locations;
+  };
+
   // functions running in the map record thread
   bool RunThread();
-  bool WriteRecordToFile(Record* record);
+  bool ProcessRecord(Record& record);
+  bool FlushRecordData(bool is_kernel, int pid);
 
   MapRecordReader map_record_reader_;
   std::unique_ptr<TemporaryFile> tmpfile_;
@@ -74,6 +84,7 @@ class MapRecordThread {
   bool thread_joined_ = false;
   std::atomic<bool> early_stop_ = false;
   std::atomic<bool> thread_result_ = false;
+  MapRecordStat stat_;
 };
 
 }  // namespace simpleperf
