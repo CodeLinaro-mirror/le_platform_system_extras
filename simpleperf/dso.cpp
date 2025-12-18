@@ -264,12 +264,23 @@ std::optional<std::string> DebugElfFileFinder::SearchFileMapByPath(std::string_v
 
 }  // namespace simpleperf_dso_impl
 
-static OneTimeFreeAllocator symbol_name_allocator;
+struct DsoGlobalState {
+  bool demangle = true;
+  std::string vmlinux;
+  std::string kallsyms;
+  std::unordered_map<std::string, BuildId> build_id_map;
+  size_t dso_count = 0;
+  uint32_t g_dump_id = 0;
+  simpleperf_dso_impl::DebugElfFileFinder debug_elf_file_finder;
+  OneTimeFreeAllocator symbol_name_allocator;
+};
+
+static DsoGlobalState dso_global_state;
 
 Symbol::Symbol(std::string_view name, uint64_t addr, uint64_t len)
     : addr(addr),
       len(len),
-      name_(symbol_name_allocator.AllocateString(name)),
+      name_(dso_global_state.symbol_name_allocator.AllocateString(name)),
       demangled_name_(nullptr),
       dump_id_(UINT_MAX) {}
 
@@ -285,7 +296,7 @@ void Symbol::SetDemangledName(std::string_view name) const {
   if (name == name_) {
     demangled_name_ = name_;
   } else {
-    demangled_name_ = symbol_name_allocator.AllocateString(name);
+    demangled_name_ = dso_global_state.symbol_name_allocator.AllocateString(name);
   }
 }
 
@@ -311,16 +322,8 @@ static bool CompareAddrToSymbol(uint64_t addr, const Symbol& s) {
   return addr < s.addr;
 }
 
-bool Dso::demangle_ = true;
-std::string Dso::vmlinux_;
-std::string Dso::kallsyms_;
-std::unordered_map<std::string, BuildId> Dso::build_id_map_;
-size_t Dso::dso_count_;
-uint32_t Dso::g_dump_id_;
-simpleperf_dso_impl::DebugElfFileFinder Dso::debug_elf_file_finder_;
-
 void Dso::SetDemangle(bool demangle) {
-  demangle_ = demangle;
+  dso_global_state.demangle = demangle;
 }
 
 extern "C" char* __cxa_demangle(const char* mangled_name, char* buf, size_t* n, int* status);
@@ -329,7 +332,7 @@ extern "C" char* rustc_demangle(const char* mangled, char* out, size_t* len, int
 #endif
 
 std::string Dso::Demangle(const std::string& name) {
-  if (!demangle_) {
+  if (!dso_global_state.demangle) {
     return name;
   }
   int status;
@@ -370,19 +373,25 @@ std::string Dso::Demangle(const std::string& name) {
 }
 
 bool Dso::SetSymFsDir(const std::string& symfs_dir) {
-  return debug_elf_file_finder_.SetSymFsDir(symfs_dir);
+  return dso_global_state.debug_elf_file_finder.SetSymFsDir(symfs_dir);
 }
 
 bool Dso::AddSymbolDir(const std::string& symbol_dir) {
-  return debug_elf_file_finder_.AddSymbolDir(symbol_dir);
+  return dso_global_state.debug_elf_file_finder.AddSymbolDir(symbol_dir);
 }
 
 void Dso::AllowMismatchedBuildId() {
-  return debug_elf_file_finder_.AllowMismatchedBuildId();
+  return dso_global_state.debug_elf_file_finder.AllowMismatchedBuildId();
 }
 
 void Dso::SetVmlinux(const std::string& vmlinux) {
-  vmlinux_ = vmlinux;
+  dso_global_state.vmlinux = vmlinux;
+}
+
+void Dso::SetKallsyms(std::string kallsyms) {
+  if (!kallsyms.empty()) {
+    dso_global_state.kallsyms = std::move(kallsyms);
+  }
 }
 
 void Dso::SetBuildIds(const std::vector<std::pair<std::string, BuildId>>& build_ids) {
@@ -391,16 +400,16 @@ void Dso::SetBuildIds(const std::vector<std::pair<std::string, BuildId>>& build_
     LOG(DEBUG) << "build_id_map: " << pair.first << ", " << pair.second.ToString();
     map.insert(pair);
   }
-  build_id_map_ = std::move(map);
+  dso_global_state.build_id_map = std::move(map);
 }
 
 void Dso::SetVdsoFile(const std::string& vdso_file, bool is_64bit) {
-  debug_elf_file_finder_.SetVdsoFile(vdso_file, is_64bit);
+  dso_global_state.debug_elf_file_finder.SetVdsoFile(vdso_file, is_64bit);
 }
 
 BuildId Dso::FindExpectedBuildIdForPath(const std::string& path) {
-  auto it = build_id_map_.find(path);
-  if (it != build_id_map_.end()) {
+  auto it = dso_global_state.build_id_map.find(path);
+  if (it != dso_global_state.build_id_map.end()) {
     return it->second;
   }
   return BuildId();
@@ -423,25 +432,21 @@ Dso::Dso(DsoType type, const std::string& path)
   } else {
     file_name_ = path;
   }
-  dso_count_++;
+  dso_global_state.dso_count++;
 }
 
 Dso::~Dso() {
-  if (--dso_count_ == 0) {
-    // Clean up global variables when no longer used.
-    symbol_name_allocator.Clear();
-    demangle_ = true;
-    vmlinux_.clear();
-    kallsyms_.clear();
-    build_id_map_.clear();
-    g_dump_id_ = 0;
-    debug_elf_file_finder_.Reset();
+  if (--dso_global_state.dso_count == 0) {
+    // Reset the global state by assigning a newly constructed object. This ensures that memory
+    // allocated by fields (like std::string and std::vector) is fully released back to the system,
+    // whereas calling clear() might only empty the containers but retain their capacity.
+    dso_global_state = DsoGlobalState();
   }
 }
 
 uint32_t Dso::CreateDumpId() {
   CHECK(!HasDumpId());
-  return dump_id_ = g_dump_id_++;
+  return dump_id_ = dso_global_state.g_dump_id++;
 }
 
 uint32_t Dso::CreateSymbolDumpId(const Symbol* symbol) {
@@ -685,7 +690,7 @@ class ElfDso : public Dso {
  protected:
   std::string FindDebugFilePath() const override {
     BuildId build_id = GetExpectedBuildId();
-    return debug_elf_file_finder_.FindDebugFile(path_, force_64bit_, build_id);
+    return dso_global_state.debug_elf_file_finder.FindDebugFile(path_, force_64bit_, build_id);
   }
 
   std::vector<Symbol> LoadSymbolsImpl() override {
@@ -753,22 +758,22 @@ class KernelDso : public Dso {
  protected:
   std::string FindDebugFilePath() const override {
     BuildId build_id = GetExpectedBuildId();
-    if (!vmlinux_.empty()) {
+    if (!dso_global_state.vmlinux.empty()) {
       // Use vmlinux as the kernel debug file.
       ElfStatus status;
-      if (ElfFile::Open(vmlinux_, &build_id, &status)) {
-        return vmlinux_;
+      if (ElfFile::Open(dso_global_state.vmlinux, &build_id, &status)) {
+        return dso_global_state.vmlinux;
       }
     }
-    return debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+    return dso_global_state.debug_elf_file_finder.FindDebugFile(path_, false, build_id);
   }
 
   std::vector<Symbol> LoadSymbolsImpl() override {
     std::vector<Symbol> symbols;
     ReadSymbolsFromDebugFile(&symbols);
 
-    if (symbols.empty() && !kallsyms_.empty()) {
-      ReadSymbolsFromKallsyms(kallsyms_, &symbols);
+    if (symbols.empty() && !dso_global_state.kallsyms.empty()) {
+      ReadSymbolsFromKallsyms(dso_global_state.kallsyms, &symbols);
     }
 #if defined(__linux__)
     if (symbols.empty()) {
@@ -948,12 +953,12 @@ std::optional<uint64_t> KernelModuleDso::IpToFileOffset(uint64_t ip, uint64_t ma
 }
 
 void KernelModuleDso::FindDebugFilePath(BuildId& build_id) {
-  debug_file_path_ = debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+  debug_file_path_ = dso_global_state.debug_elf_file_finder.FindDebugFile(path_, false, build_id);
 }
 
 std::string KernelModuleDso::FindDebugFilePath() const {
   BuildId build_id = GetExpectedBuildId();
-  return debug_elf_file_finder_.FindDebugFile(path_, false, build_id);
+  return dso_global_state.debug_elf_file_finder.FindDebugFile(path_, false, build_id);
 }
 
 void KernelModuleDso::SetFirstSymbolInMemory(const Symbol& symbol) {
@@ -1099,7 +1104,8 @@ std::unique_ptr<Dso> Dso::CreateDsoWithBuildId(DsoType dso_type, const std::stri
       LOG(ERROR) << "Unexpected dso_type " << static_cast<int>(dso_type);
       return nullptr;
   }
-  dso->debug_file_path_ = debug_elf_file_finder_.FindDebugFile(dso_path, false, build_id);
+  dso->debug_file_path_ =
+      dso_global_state.debug_elf_file_finder.FindDebugFile(dso_path, false, build_id);
   return dso;
 }
 
