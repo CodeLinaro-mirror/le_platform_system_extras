@@ -105,8 +105,14 @@ bool MapRecordReader::ReadProcessMaps(pid_t pid, const std::unordered_set<pid_t>
   return true;
 }
 
-MapRecordThread::MapRecordThread(const MapRecordReader& map_record_reader)
+MapRecordThread::MapRecordThread(const MapRecordReader& map_record_reader,
+                                 const char* binary_name_pattern)
     : map_record_reader_(map_record_reader), fp_(nullptr, fclose) {
+  if (binary_name_pattern != nullptr) {
+    // RegEx is not thread-safe for concurrent calls. Create a new instance to be used
+    // exclusively by this thread.
+    binary_name_regex_ = RegEx::Create(binary_name_pattern);
+  }
   tmpfile_ = ScopedTempFiles::CreateTempFile();
   fp_.reset(fdopen(tmpfile_->release(), "r+"));
   thread_ = std::thread([this]() { thread_result_ = RunThread(); });
@@ -139,6 +145,16 @@ bool MapRecordThread::RunThread() {
 }
 
 bool MapRecordThread::ProcessRecord(Record& r) {
+  if (binary_name_regex_ != nullptr) {
+    // Only filter user-space maps based on binary name. Kernel maps are small enough to be always
+    // kept.
+    if (r.type() == PERF_RECORD_MMAP2) {
+      auto& map_r = static_cast<Mmap2Record&>(r);
+      if (!binary_name_regex_->Search(map_r.filename)) {
+        return true;
+      }
+    }
+  }
   stat_.record_buffer.insert(stat_.record_buffer.end(), r.Binary(), r.Binary() + r.size());
   return true;
 }

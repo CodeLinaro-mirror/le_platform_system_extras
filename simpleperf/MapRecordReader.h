@@ -26,6 +26,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "RegEx.h"
 #include "event_attr.h"
 #include "record.h"
 
@@ -55,7 +56,7 @@ class MapRecordReader {
 // read back after recording.
 class MapRecordThread {
  public:
-  MapRecordThread(const MapRecordReader& map_record_reader);
+  MapRecordThread(const MapRecordReader& map_record_reader, const char* binary_name_pattern);
   ~MapRecordThread();
 
   bool Join();
@@ -78,6 +79,7 @@ class MapRecordThread {
   bool FlushRecordData(bool is_kernel, int pid);
 
   MapRecordReader map_record_reader_;
+  std::unique_ptr<RegEx> binary_name_regex_;
   std::unique_ptr<TemporaryFile> tmpfile_;
   std::unique_ptr<FILE, decltype(&fclose)> fp_;
   std::thread thread_;
