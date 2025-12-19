@@ -26,6 +26,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "RegEx.h"
 #include "event_attr.h"
 #include "record.h"
 
@@ -55,7 +56,7 @@ class MapRecordReader {
 // read back after recording.
 class MapRecordThread {
  public:
-  MapRecordThread(const MapRecordReader& map_record_reader);
+  MapRecordThread(const MapRecordReader& map_record_reader, const char* binary_name_pattern);
   ~MapRecordThread();
 
   bool Join();
@@ -63,17 +64,29 @@ class MapRecordThread {
   bool ReadMapRecords(const std::function<void(const Record*)>& callback, bool only_kernel_maps);
 
  private:
+  using MapRecordLocation = std::pair<uint64_t, uint64_t>;  // a pair of file offset and size
+
+  struct MapRecordStat {
+    uint64_t current_offset = 0;
+    std::vector<char> record_buffer;
+    MapRecordLocation kernel_location;
+    std::map<int, MapRecordLocation> process_locations;
+  };
+
   // functions running in the map record thread
   bool RunThread();
-  bool WriteRecordToFile(Record* record);
+  bool ProcessRecord(Record& record);
+  bool FlushRecordData(bool is_kernel, int pid);
 
   MapRecordReader map_record_reader_;
+  std::unique_ptr<RegEx> binary_name_regex_;
   std::unique_ptr<TemporaryFile> tmpfile_;
   std::unique_ptr<FILE, decltype(&fclose)> fp_;
   std::thread thread_;
   bool thread_joined_ = false;
   std::atomic<bool> early_stop_ = false;
   std::atomic<bool> thread_result_ = false;
+  MapRecordStat stat_;
 };
 
 }  // namespace simpleperf
