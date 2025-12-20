@@ -1558,7 +1558,9 @@ bool RecordCommand::DumpMaps() {
     //   all process maps. To reduce pre recording time, we dump process maps in map record thread
     //   while recording.
     if (event_selection_set_.HasAuxTrace() && !etm_branch_list_generator_) {
-      map_record_thread_.emplace(*map_record_reader_);
+      const char* binary_name_pattern =
+          binary_name_regex_ ? binary_name_regex_->GetPattern().c_str() : nullptr;
+      map_record_thread_.emplace(*map_record_reader_, binary_name_pattern);
       return true;
     }
     if (!event_selection_set_.ExcludeKernel()) {
