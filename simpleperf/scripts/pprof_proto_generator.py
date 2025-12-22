@@ -320,6 +320,8 @@ class PprofProfileGenerator(object):
         meta_info = self.lib.MetaInfo()
         if "app_versioncode" in meta_info:
             comments.append("App Version Code:\n" + meta_info["app_versioncode"])
+        if "app_type" in meta_info:
+            comments.append("App Type:\n" + meta_info["app_type"])
         for comment in comments:
             self.profile.comment.append(self.get_string_id(comment))
         if "timestamp" in meta_info:

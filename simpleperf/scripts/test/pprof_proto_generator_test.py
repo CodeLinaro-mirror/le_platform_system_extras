@@ -371,3 +371,7 @@ class TestPprofProtoGenerator(TestBase):
     def test_no_demangle(self):
         output = self.run_generator(['--no-demangle'])
         self.assertIn('name: _ZN7android14IPCThreadState14talkWithDriverEb', output)
+
+    def test_app_type(self):
+        output = self.run_generator(None, 'perf_with_trace_offcpu_v2.data')
+        self.assertRegex(output, r'App Type:\s*debuggable')
