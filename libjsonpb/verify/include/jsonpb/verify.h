@@ -20,10 +20,10 @@
 #include <string>
 #include <vector>
 
+#include <android-base/result.h>
 #include <google/protobuf/message.h>
 #include <json/reader.h>
 #include <json/value.h>
-#include <jsonpb/jsonpb.h>
 
 namespace android {
 namespace jsonpb {
@@ -82,8 +82,8 @@ bool EqReformattedJson(const std::string& json, google::protobuf::Message* scrat
 
 namespace internal {
 // See EqReformattedJson().
-ErrorOr<std::string> FormatJson(const std::string& json, google::protobuf::Message* scratch_space);
-
+android::base::Result<std::string> FormatJson(const std::string& json,
+                                              google::protobuf::Message* scratch_space);
 }  // namespace internal
 
 }  // namespace jsonpb

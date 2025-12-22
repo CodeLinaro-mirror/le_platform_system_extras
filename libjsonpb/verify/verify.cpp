@@ -22,19 +22,21 @@
 #include <string>
 
 #include <absl/strings/str_cat.h>
+#include <android-base/result.h>
 #include <android-base/strings.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/reflection.h>
+#include <google/protobuf/util/json_util.h>
 #include <json/reader.h>
 #include <json/writer.h>
-#include <jsonpb/jsonpb.h>
 
 namespace android {
 namespace jsonpb {
 
 using google::protobuf::FieldDescriptor;
 using google::protobuf::Message;
+using google::protobuf::util::JsonPrintOptions;
 
 // Return json_name of the field. If it is not set, return the name of the
 // field.
@@ -158,7 +160,7 @@ bool EqReformattedJson(const std::string& json, google::protobuf::Message* scrat
 
   auto new_json_string = internal::FormatJson(json, scratch_space);
   if (!new_json_string.ok()) {
-    *error = new_json_string.error();
+    *error = new_json_string.error().message();
     return false;
   }
   Json::Value new_json;
@@ -194,12 +196,21 @@ bool EqReformattedJson(const std::string& json, google::protobuf::Message* scrat
 }
 
 namespace internal {
-ErrorOr<std::string> FormatJson(const std::string& json, google::protobuf::Message* scratch_space) {
-  auto res = internal::JsonStringToMessage(json, scratch_space);
+android::base::Result<std::string> FormatJson(const std::string& json,
+                                              google::protobuf::Message* scratch_space) {
+  auto res = google::protobuf::util::JsonStringToMessage(json, scratch_space);
   if (!res.ok()) {
-    return MakeError<std::string>(res.error());
+    return android::base::Error() << res;
   }
-  return MessageToJsonString(*scratch_space);
+  std::string ret;
+  res = google::protobuf::util::MessageToJsonString(*scratch_space, &ret,
+                                                    JsonPrintOptions{
+                                                        .add_whitespace = true,
+                                                    });
+  if (!res.ok()) {
+    return android::base::Error() << res;
+  }
+  return ret;
 }
 }  // namespace internal
 

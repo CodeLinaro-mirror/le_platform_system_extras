@@ -23,10 +23,10 @@
 
 #include <android-base/file.h>
 #include <android-base/strings.h>
+#include <google/protobuf/util/json_util.h>
 #include <gtest/gtest.h>
 #include <json/reader.h>
 #include <json/writer.h>
-#include <jsonpb/jsonpb.h>
 #include <jsonpb/verify.h>
 
 // JsonSchemaTest test that a given JSON file conforms to a given schema.
@@ -83,8 +83,8 @@ class JsonSchemaTest : public ::testing::TestWithParam<JsonSchemaTestConfigFacto
     ASSERT_FALSE(json_.empty()) << "File '" << file_path_ << "' exists but is empty";
 
     object_ = config->CreateMessage();
-    auto res = internal::JsonStringToMessage(json_, object_.get());
-    ASSERT_TRUE(res.ok()) << "Invalid format of file " << file_path_ << ": " << res.error();
+    auto res = google::protobuf::util::JsonStringToMessage(json_, object_.get());
+    ASSERT_TRUE(res.ok()) << "Invalid format of file " << file_path_ << ": " << res;
   }
   google::protobuf::Message* message() const { return object_.get(); }
   std::string file_path_;
