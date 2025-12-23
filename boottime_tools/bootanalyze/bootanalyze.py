@@ -136,17 +136,19 @@ def main():
   boottime_points = collections.OrderedDict()
   shutdown_event_all = collections.OrderedDict()
   shutdown_timing_event_all = collections.OrderedDict()
+  prefetch_metric_points = collections.OrderedDict()
   for it in range(0, args.iterate):
     if args.iterate > 1:
       print(f"Run: {it}")
     attempt = 1
     processing_data = None
     boottime_events = None
+    prefetch_metrics = None
     while attempt <= _MAX_RETRIES and processing_data is None:
       attempt += 1
       (processing_data, kernel_timings, logcat_timings,
        boottime_events, shutdown_events,
-       shutdown_timing_events) = iterate(args, search_events_pattern,
+       shutdown_timing_events, prefetch_metrics) = iterate(args, search_events_pattern,
                                          timing_events_pattern,
                                          shutdown_events_pattern, cfg,
                                          error_time, components_to_monitor)
@@ -164,6 +166,13 @@ def main():
           events = []
           shutdown_timing_event_all[k] = events
         events.append(v)
+
+    if prefetch_metrics:
+      for k, v in prefetch_metrics.items():
+        if k not in prefetch_metric_points:
+          prefetch_metric_points[k] = []
+        prefetch_metric_points[k].append(v)
+
     if not processing_data or not boottime_events:
       # Processing error
       print("Failed to collect valid samples for run", it)
@@ -253,6 +262,17 @@ def main():
       print("{0:30}: {1:<7.5} {2:<7.5} {3}".format(
         item[0], item[1], item[2],
         item[3] if item[3] != args.iterate else ""))
+
+    if args.prefetch_metrics:
+      print("-----------------")
+      print(f"Prefetch metrics after {args.iterate} runs")
+      print("{0:30}: {1:<10} {2:<7} {3}".format(
+        "Metric", "Mean", "stddev", "#runs"))
+      for item in prefetch_metric_points.items():
+        num_runs = len(item[1])
+        print("{0:30}: {1:<10} {2:<7.5} {3}".format(
+          item[0], sum(item[1]) / num_runs, stddev(item[1]),
+          num_runs if num_runs != args.iterate else ""))
 
     run_adb_shell_cmd_as_root("rm /data/bootchart/enabled")
 
@@ -577,8 +597,17 @@ def iterate(args, search_events_pattern, timings_pattern,
       if (fs_stat_val & ~0x17) != 0:
         capture_bugreport(f"fs_stat_{fs_stat}", events[_LOGCAT_BOOT_COMPLETE])
 
+  prefetch_metrics = None
+  if args.prefetch_metrics:
+    prefetch_metrics = collect_prefetch_metrics(args.output)
+    print("-----------------")
+    print("Prefetch metrics:")
+    for key, value in prefetch_metrics.items():
+      print(f"{key:<30}: {value}")
+    print("-----------------")
+
   return (data_points, kernel_timing_points, logcat_timing_points,
-          boottime_events, shutdown_events, shutdown_timing_events)
+          boottime_events, shutdown_events, shutdown_timing_events, prefetch_metrics)
 
 
 def prepare_login_credentials():
@@ -716,6 +745,10 @@ def init_arguments():
                       action="store_true",
                       help=("wait until launcher is shown and also collect"
                             "launcher shown event"))
+  parser.add_argument("--prefetch-metrics",
+                      dest="prefetch_metrics",
+                      action="store_true",
+                      help=("Collect prefetch metrics from the device."))
   return parser.parse_args()
 
 
@@ -1198,6 +1231,58 @@ def grab_carwatchdog_bootstats(result_dir):
   out_proto_file_path = os.path.join(result_dir,
                                      "carwatchdog_perf_stats_out.pb")
   generate_proto(dump_file_name, build_info_file_path, out_proto_file_path)
+
+
+def collect_prefetch_metrics(output_dir):
+  """Pulls and parses prefetch metrics from the device from multiple stat files."""
+  metrics = {
+    'prefetched_records': 0,
+    'prefetched_bytes': 0,
+    'prefetched_pages': 0,
+    'exec_time_ms': 0
+  }
+  # List of prefetch stat paths on the device.
+  metric_paths = [
+    '/metadata/prefetch/prefetch.stat',
+    '/metadata/prefetch/prefetch_apex.stat'
+  ]
+
+  for metric_path in metric_paths:
+    # Use adb shell cat to read the file content directly.
+    # The /metadata partition requires root access.
+    content, ret_code = run_adb_shell_cmd_as_root(f"cat {metric_path}")
+
+    if ret_code != 0:
+      print(f"Prefetch metrics file '{metric_path}' not found or not readable, skipping.")
+      continue
+
+    # If an output directory is specified, save the content for debugging.
+    if output_dir:
+      try:
+        local_path = os.path.join(output_dir, os.path.basename(metric_path))
+        with open(local_path, 'w', encoding='utf-8') as f:
+          f.write(content)
+      except IOError as e:
+        print(f"Warning: Could not write prefetch metrics to {local_path}: {e}")
+
+    for line in content.splitlines():
+      parts = line.strip().split(': ')
+      if len(parts) == 2:
+        key, value_str = parts
+        if key in metrics:
+          try:
+            value = int(value_str)
+          except ValueError:
+            print(f"Warning: Could not parse value for key: '{key}' val: '{value_str}'"
+                  f"in file {metric_path}. Using 0 instead.")
+            value = 0
+          # Summing up the metrics from both files
+          metrics[key] += value
+      else:
+        print(f"Error: the line:{line} in file: {metric_path} does not follow "
+              f"metric_name: metric_value pattern")
+
+  return metrics
 
 
 if __name__ == "__main__":
