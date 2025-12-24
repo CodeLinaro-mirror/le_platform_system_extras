@@ -30,7 +30,7 @@
 #define CMD_NAND  "cat /proc/mtd"
 #define CMD_CPUDETAIL   "mpstat | tail -1 | awk '{print $11}'"
 #define CMD_STIME    "uptime"
-#define CMD_PSCOUNT  "ps | wc -l"
+#define CMD_PSCOUNT  "ps -ef | wc -l"
 #define CMD_LOGDETAIL   "grep 'log_size' /etc/config/system"
 #define CMD_OSDETAIL    "cat /etc/os-release"
 #define CMD_RLOG    "dmesg -c"
