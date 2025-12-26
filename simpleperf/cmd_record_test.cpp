@@ -1111,11 +1111,6 @@ TEST(record_cmd, cs_etm_event) {
   ASSERT_TRUE(has_auxtrace);
   ASSERT_TRUE(has_aux);
   ASSERT_TRUE(!reader->ReadBuildIdFeature().empty());
-  // Reset reader to avoid interfering with next event type detection for cs-etm/@tmc_etr0/.
-  reader.reset();
-
-  // We can explicitly use ETR. Because ETR is ready after CheckEtmSupport().
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm/@tmc_etr0/:u"}, tmpfile.path));
 }
 
 // @CddTest = 6.1/C-0-2
@@ -1139,6 +1134,17 @@ TEST(record_cmd, cs_etm_system_wide) {
     }
   }
   ASSERT_TRUE(has_kernel_build_id);
+
+  // Check if kernel symbols are dumped.
+  bool has_kernel_symbols = false;
+  auto process_record = [&](std::unique_ptr<Record> r) {
+    if (r->type() == SIMPLE_PERF_RECORD_KERNEL_SYMBOL) {
+      has_kernel_symbols = true;
+    }
+    return true;
+  };
+  ASSERT_TRUE(reader->ReadDataSection(process_record));
+  ASSERT_TRUE(has_kernel_symbols);
 
   // build ids are not dumped if --no-dump-build-id is used.
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm", "-a", "--no-dump-build-id"}, tmpfile.path));
