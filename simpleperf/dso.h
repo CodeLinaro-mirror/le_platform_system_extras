@@ -128,11 +128,7 @@ class Dso {
   // be searched recursively to build a build_id_map.
   static bool AddSymbolDir(const std::string& symbol_dir);
   static void SetVmlinux(const std::string& vmlinux);
-  static void SetKallsyms(std::string kallsyms) {
-    if (!kallsyms.empty()) {
-      kallsyms_ = std::move(kallsyms);
-    }
-  }
+  static void SetKallsyms(std::string kallsyms);
   static void AllowMismatchedBuildId();
   static void SetBuildIds(const std::vector<std::pair<std::string, BuildId>>& build_ids);
   static BuildId FindExpectedBuildIdForPath(const std::string& path);
@@ -200,14 +196,6 @@ class Dso {
   bool IsForJavaMethod() const;
 
  protected:
-  static bool demangle_;
-  static std::string vmlinux_;
-  static std::string kallsyms_;
-  static std::unordered_map<std::string, BuildId> build_id_map_;
-  static size_t dso_count_;
-  static uint32_t g_dump_id_;
-  static simpleperf_dso_impl::DebugElfFileFinder debug_elf_file_finder_;
-
   Dso(DsoType type, const std::string& path);
   BuildId GetExpectedBuildId() const;
 

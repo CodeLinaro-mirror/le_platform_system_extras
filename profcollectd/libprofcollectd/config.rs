@@ -110,7 +110,7 @@ fn get_build_fingerprint() -> Result<String> {
     get_property("ro.build.fingerprint", "unknown".to_string())
 }
 
-fn get_device_config<T>(key: &str, default_value: T) -> Result<T>
+pub fn get_device_config<T>(key: &str, default_value: T) -> Result<T>
 where
     T: FromStr + ToString,
     T::Err: Error + Send + Sync + 'static,
