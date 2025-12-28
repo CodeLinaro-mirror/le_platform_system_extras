@@ -64,13 +64,32 @@ class OneTimeFreeAllocator {
   explicit OneTimeFreeAllocator(size_t unit_size = 8192u)
       : unit_size_(unit_size), cur_(nullptr), end_(nullptr) {}
 
+  OneTimeFreeAllocator(OneTimeFreeAllocator&& other) noexcept
+      : unit_size_(other.unit_size_), v_(std::move(other.v_)), cur_(other.cur_), end_(other.end_) {
+    other.cur_ = nullptr;
+    other.end_ = nullptr;
+  }
+
+  OneTimeFreeAllocator& operator=(OneTimeFreeAllocator&& other) noexcept {
+    if (this != &other) {
+      Clear();
+      unit_size_ = other.unit_size_;
+      v_ = std::move(other.v_);
+      cur_ = other.cur_;
+      end_ = other.end_;
+      other.cur_ = nullptr;
+      other.end_ = nullptr;
+    }
+    return *this;
+  }
+
   ~OneTimeFreeAllocator() { Clear(); }
 
   void Clear();
   const char* AllocateString(std::string_view s);
 
  private:
-  const size_t unit_size_;
+  size_t unit_size_;
   std::vector<char*> v_;
   char* cur_;
   char* end_;
