@@ -349,6 +349,15 @@ char* rlog(void) {
         if(ret == -1)
                 perror("fread");
 	pclose(fp);
+
+#ifdef FEATURE_PRPLWRT
+	if(!(fp = popen (CMD_CLEAR_SLOG,"r"))) {
+		perror("popen");
+		exit(EXIT_FAILURE);
+	}
+	pclose(fp);
+#endif
+
 	free(outbuff);
 	return "Success";
 }
