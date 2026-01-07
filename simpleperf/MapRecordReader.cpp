@@ -105,9 +105,14 @@ bool MapRecordReader::ReadProcessMaps(pid_t pid, const std::unordered_set<pid_t>
   return true;
 }
 
-MapRecordThread::MapRecordThread(const MapRecordReader& map_record_reader)
+MapRecordThread::MapRecordThread(const MapRecordReader& map_record_reader,
+                                 const char* binary_name_pattern)
     : map_record_reader_(map_record_reader), fp_(nullptr, fclose) {
-  map_record_reader_.SetCallback([this](Record* r) { return WriteRecordToFile(r); });
+  if (binary_name_pattern != nullptr) {
+    // RegEx is not thread-safe for concurrent calls. Create a new instance to be used
+    // exclusively by this thread.
+    binary_name_regex_ = RegEx::Create(binary_name_pattern);
+  }
   tmpfile_ = ScopedTempFiles::CreateTempFile();
   fp_.reset(fdopen(tmpfile_->release(), "r+"));
   thread_ = std::thread([this]() { thread_result_ = RunThread(); });
@@ -124,25 +129,54 @@ bool MapRecordThread::RunThread() {
   if (!fp_) {
     return false;
   }
-  if (!map_record_reader_.ReadKernelMaps()) {
+  map_record_reader_.SetCallback([this](Record* r) { return ProcessRecord(*r); });
+  if (!map_record_reader_.ReadKernelMaps() || !FlushRecordData(true, -1)) {
     return false;
   }
   for (auto pid : GetAllProcesses()) {
     if (early_stop_) {
       return false;
     }
-    if (!map_record_reader_.ReadProcessMaps(pid, 0)) {
+    if (!map_record_reader_.ReadProcessMaps(pid, 0) || !FlushRecordData(false, pid)) {
       return false;
     }
   }
   return true;
 }
 
-bool MapRecordThread::WriteRecordToFile(Record* record) {
-  if (fwrite(record->Binary(), record->size(), 1, fp_.get()) != 1) {
+bool MapRecordThread::ProcessRecord(Record& r) {
+  if (binary_name_regex_ != nullptr) {
+    // Only filter user-space maps based on binary name. Kernel maps are small enough to be always
+    // kept.
+    if (r.type() == PERF_RECORD_MMAP2) {
+      auto& map_r = static_cast<Mmap2Record&>(r);
+      if (!binary_name_regex_->Search(map_r.filename)) {
+        return true;
+      }
+    }
+  }
+  stat_.record_buffer.insert(stat_.record_buffer.end(), r.Binary(), r.Binary() + r.size());
+  return true;
+}
+
+bool MapRecordThread::FlushRecordData(bool is_kernel, int pid) {
+  if (stat_.record_buffer.empty()) {
+    return true;
+  }
+  if (fwrite(stat_.record_buffer.data(), stat_.record_buffer.size(), 1, fp_.get()) != 1) {
     PLOG(ERROR) << "failed to write map records to file";
     return false;
   }
+  if (is_kernel) {
+    stat_.kernel_location.first = stat_.current_offset;
+    stat_.kernel_location.second = stat_.record_buffer.size();
+  } else {
+    auto& location = stat_.process_locations[pid];
+    location.first = stat_.current_offset;
+    location.second = stat_.record_buffer.size();
+  }
+  stat_.current_offset += stat_.record_buffer.size();
+  stat_.record_buffer.clear();
   return true;
 }
 
@@ -152,6 +186,16 @@ bool MapRecordThread::Join() {
     thread_joined_ = true;
     if (!thread_result_) {
       LOG(ERROR) << "map record thread failed";
+    }
+    if (WOULD_LOG(VERBOSE)) {
+      LOG(VERBOSE) << "MapRecordThread stat:";
+      LOG(VERBOSE) << "Kernel map size: " << stat_.kernel_location.second;
+      LOG(VERBOSE) << "User process count: " << stat_.process_locations.size();
+      uint64_t process_map_size = 0;
+      for (const auto& [_, location] : stat_.process_locations) {
+        process_map_size += location.second;
+      }
+      LOG(VERBOSE) << "User process map size: " << process_map_size;
     }
   }
   return thread_result_;
@@ -190,23 +234,30 @@ bool MapRecordThread::ReadMapRecordData(const std::function<bool(const char*, si
 
 bool MapRecordThread::ReadMapRecords(const std::function<void(const Record*)>& callback,
                                      bool only_kernel_maps) {
-  if (fseek(fp_.get(), 0, SEEK_END) != 0) {
-    PLOG(ERROR) << "fseek() failed";
-    return false;
+  uint64_t read_offset = 0;
+  uint64_t read_size = 0;
+  if (only_kernel_maps) {
+    read_offset = stat_.kernel_location.first;
+    read_size = stat_.kernel_location.second;
+  } else {
+    if (fseek(fp_.get(), 0, SEEK_END) != 0) {
+      PLOG(ERROR) << "fseek() failed";
+      return false;
+    }
+    off_t offset = ftello(fp_.get());
+    if (offset == -1) {
+      PLOG(ERROR) << "ftello() failed";
+      return false;
+    }
+    read_size = static_cast<uint64_t>(offset);
   }
-  off_t offset = ftello(fp_.get());
-  if (offset == -1) {
-    PLOG(ERROR) << "ftello() failed";
-    return false;
-  }
-  uint64_t file_size = static_cast<uint64_t>(offset);
-  if (fseek(fp_.get(), 0, SEEK_SET) != 0) {
+  if (fseek(fp_.get(), read_offset, SEEK_SET) != 0) {
     PLOG(ERROR) << "fseek() failed";
     return false;
   }
   uint64_t nread = 0;
   std::vector<char> buffer(1024);
-  while (nread < file_size) {
+  while (nread < read_size) {
     if (fread(buffer.data(), Record::header_size(), 1, fp_.get()) != 1) {
       PLOG(ERROR) << "fread() failed";
       return false;
@@ -226,9 +277,6 @@ bool MapRecordThread::ReadMapRecords(const std::function<void(const Record*)>& c
     auto r = ReadRecordFromBuffer(map_record_reader_.Attr(), header.type, buffer.data(),
                                   buffer.data() + header.size);
     CHECK(r);
-    if (only_kernel_maps && !r->InKernel()) {
-      break;
-    }
     callback(r.get());
     nread += header.size;
   }
