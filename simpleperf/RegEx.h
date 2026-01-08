@@ -32,7 +32,8 @@ class RegExMatch {
   virtual void MoveToNextMatch() = 0;
 };
 
-// A wrapper of std::regex, converting std::regex_error exception into return value.
+// A wrapper of the regex engine (currently libpcre2). It is not thread-safe for concurrent calls
+// on the same object.
 class RegEx {
  public:
   static std::unique_ptr<RegEx> Create(std::string_view pattern);
