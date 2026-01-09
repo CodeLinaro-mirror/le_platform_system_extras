@@ -216,7 +216,7 @@ class ToolFinder:
                     return path
             # Search for the tool in the host binary directory. It works for python host binaries
             # built with llvm binutils.
-            if path := get_host_binary_path(toolname):
+            if path := get_host_binary_path(toolname, check=False):
                 return path
 
         # Search for the tool in Android NDK and SDK.
