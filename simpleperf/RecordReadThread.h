@@ -152,9 +152,9 @@ class ETMDataRateLimiter {
   timeval GetNextReadInterval(uint64_t data_size, uint64_t timestamp);
 
  private:
-  uint64_t max_size_per_second_;
-  uint64_t min_read_interval_ns_;
-  uint64_t start_timestamp_;
+  const uint64_t max_size_per_second_;
+  const uint64_t min_read_interval_ns_;
+  const uint64_t start_timestamp_;
 };
 
 // To reduce sample lost rate when recording dwarf based call graph, RecordReadThread uses a

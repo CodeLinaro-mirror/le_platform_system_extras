@@ -689,9 +689,9 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
     }
     record_buffer_size = default_size.value();
   }
-  if (!event_selection_set_.MmapEventFiles(mmap_page_range_.first, mmap_page_range_.second,
-                                           aux_buffer_size_, record_buffer_size,
-                                           allow_truncating_samples_, exclude_perf_)) {
+  if (!event_selection_set_.MmapEventFiles(
+          mmap_page_range_.first, mmap_page_range_.second, aux_buffer_size_, record_buffer_size,
+          allow_truncating_samples_, exclude_perf_, etm_flush_interval_)) {
     return false;
   }
   auto callback = std::bind(&RecordCommand::ProcessRecord, this, std::placeholders::_1);

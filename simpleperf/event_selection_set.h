@@ -17,6 +17,7 @@
 #ifndef SIMPLE_PERF_EVENT_SELECTION_SET_H_
 #define SIMPLE_PERF_EVENT_SELECTION_SET_H_
 
+#include <chrono>
 #include <functional>
 #include <map>
 #include <set>
@@ -150,7 +151,8 @@ class EventSelectionSet {
   bool OpenEventFilesForThreads(const std::set<pid_t>& threads);
   bool ReadCounters(std::vector<CountersInfo>* counters);
   bool MmapEventFiles(size_t min_mmap_pages, size_t max_mmap_pages, size_t aux_buffer_size,
-                      size_t record_buffer_size, bool allow_truncating_samples, bool exclude_perf);
+                      size_t record_buffer_size, bool allow_truncating_samples, bool exclude_perf,
+                      std::chrono::milliseconds etm_flush_interval = 100ms);
   bool PrepareToReadMmapEventData(const std::function<bool(Record*)>& callback);
   bool SyncKernelBuffer();
   bool FinishReadMmapEventData();
