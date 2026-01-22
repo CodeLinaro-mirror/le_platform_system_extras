@@ -340,6 +340,22 @@ class DevfreqCounters {
         }
       }
     }
+    if (mem_latency_governor_paths_.empty() && IsRegularFile(kPmuLibPath)) {
+      std::string content;
+      if (!android::base::ReadFileToString(kPmuLibPath, &content)) {
+        LOG(ERROR) << "failed to read " << kPmuLibPath;
+        return false;
+      }
+      content = android::base::Trim(content);
+      if (content == "1") {
+        if (!android::base::WriteStringToFile(kPmuLibDisableMagic, kPmuLibPath)) {
+          PLOG(ERROR) << "failed to write " << kPmuLibPath;
+          return false;
+        }
+        pmu_lib_restore_ = true;
+      }
+    }
+
     return true;
   }
 
@@ -347,10 +363,19 @@ class DevfreqCounters {
     for (auto& path : mem_latency_governor_paths_) {
       android::base::WriteStringToFile("mem_latency", path);
     }
+    if (pmu_lib_restore_) {
+      android::base::WriteStringToFile(kPmuLibEnableMagic, kPmuLibPath);
+    }
   }
 
  private:
+  // https://android.googlesource.com/kernel/msm/+/79e5f2cc/drivers/soc/qcom/dcvs/pmu_lib.c#1013
+  static constexpr const char* kPmuLibEnableMagic = "BEEFDEAD";
+  static constexpr const char* kPmuLibDisableMagic = "DEADBEEF";
+  static constexpr const char* kPmuLibPath = "/sys/devices/system/cpu/pmu_lib/enable_counters";
+
   std::vector<std::string> mem_latency_governor_paths_;
+  bool pmu_lib_restore_ = false;
 };
 
 // Periodically scan /proc for new threads. If found, create new perf event files for the
