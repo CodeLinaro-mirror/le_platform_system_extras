@@ -42,6 +42,9 @@ cc_library_shared {
         "liblp",
         "libprotobuf-cpp-full",
     ],
+    header_libs: [
+        "libupdate_engine_headers",
+    ],
     srcs: [
         "lpdump.cc",
         "dynamic_partitions_device_info.proto",
