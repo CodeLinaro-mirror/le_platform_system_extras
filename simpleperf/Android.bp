@@ -110,16 +110,18 @@ cc_library_static {
     },
 }
 
-// Build regex support in a separate library to catch std::regex_error exception.
 cc_library_static {
     name: "libsimpleperf_regex",
     host_supported: true,
     srcs: ["RegEx.cpp"],
-    cppflags: ["-fexceptions"],
-    static_libs: ["libbase"],
+    static_libs: [
+        "libbase",
+        "libpcre2",
+    ],
     target: {
         windows: {
             enabled: true,
+            cflags: ["-DPCRE2_STATIC"],
         },
     },
 }
@@ -135,6 +137,7 @@ cc_defaults {
     static_libs: [
         "libsimpleperf_etm_decoder",
         "libsimpleperf_regex",
+        "libpcre2",
         "libbase",
         "liblog",
         "liblzma",
@@ -178,41 +181,31 @@ cc_defaults {
         "libsimpleperf_readelf_defaults",
         "rust_static_std",
     ],
-    host_supported: true,
-    shared_libs: [
-        "libbase",
-        "liblog",
-        "liblzma",
-        "libprotobuf-cpp-lite",
-        "libz",
-        "libziparchive",
-    ],
+    host_supported: false,
     static_libs: [
         "libsimpleperf_etm_decoder",
         "libsimpleperf_regex",
+        "libdexfile_support",
         "libopencsd_decoder",
+        "librustc_demangle_static",
         "libzstd",
     ],
-    target: {
-        linux: {
-            shared_libs: [
-                "libcutils",
-                "libevent",
-                "libprocinfo",
-                "libunwindstack",
-            ],
-            static_libs: [
-                "libdexfile_support",
-                "librustc_demangle_static",
-            ],
-            runtime_libs: [
-                "libdexfile", // libdexfile_support dependency
-            ],
-        },
-        windows: {
-            enabled: true,
-        },
-    },
+    shared_libs: [
+        "libbase",
+        "libcutils",
+        "libevent",
+        "liblog",
+        "liblzma",
+        "libpcre2",
+        "libprocinfo",
+        "libprotobuf-cpp-lite",
+        "libunwindstack",
+        "libz",
+        "libziparchive",
+    ],
+    runtime_libs: [
+        "libdexfile", // libdexfile_support dependency
+    ],
     use_version_lib: true,
 }
 
@@ -657,6 +650,11 @@ cc_test {
         android: {
             test_suites: ["device-tests"],
         },
+        darwin: {
+            host_ldlibs: [
+                "-framework CoreFoundation",
+            ],
+        },
     },
     data: [
         "testdata/**/*",
@@ -738,9 +736,25 @@ filegroup {
     srcs: ["CtsSimpleperfTestCases_testdata/**/*"],
 }
 
+cc_defaults {
+    name: "simpleperf_fuzzer_defaults",
+    fuzz_config: {
+        vector: "local_with_developer_options",
+        service_privilege: "privileged",
+        users: "multi_user",
+        fuzzed_code_usage: "shipped",
+
+        triage_assignee: "yabinc@google.com",
+        componentid: 1284821,
+        cc: ["android-llvm-dev@google.com"],
+    },
+    native_coverage: false,
+}
+
 cc_fuzz {
     name: "libsimpleperf_report_fuzzer",
     defaults: [
+        "simpleperf_fuzzer_defaults",
         "simpleperf_static_libs",
         "libdexfile_static_transitive_defaults",
     ],
@@ -765,18 +779,12 @@ cc_fuzz {
     },
     dictionary: "simpleperf_dict.dict",
     corpus: ["testdata/**/*.data"],
-    fuzz_config: {
-        vector: "local_with_developer_options",
-        service_privilege: "privileged",
-        users: "multi_user",
-        fuzzed_code_usage: "shipped",
-    },
-    native_coverage: false,
 }
 
 cc_fuzz {
     name: "simpleperf_writer_fuzzer",
     defaults: [
+        "simpleperf_fuzzer_defaults",
         "simpleperf_static_libs",
         "libdexfile_static_transitive_defaults",
     ],
@@ -799,13 +807,6 @@ cc_fuzz {
             enabled: false,
         },
     },
-    fuzz_config: {
-        vector: "local_with_developer_options",
-        service_privilege: "privileged",
-        users: "multi_user",
-        fuzzed_code_usage: "shipped",
-    },
-    native_coverage: false,
 }
 
 genrule {

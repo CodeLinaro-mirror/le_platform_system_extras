@@ -178,8 +178,8 @@ bool EventFd::CreateMappedBuffer(size_t mmap_pages, bool report_error) {
   mmap_addr_ = mmap_addr;
   mmap_len_ = mmap_len;
   mmap_metadata_page_ = reinterpret_cast<perf_event_mmap_page*>(mmap_addr_);
-  mmap_data_buffer_ = reinterpret_cast<char*>(mmap_addr_) + page_size;
-  mmap_data_buffer_size_ = mmap_len_ - page_size;
+  mmap_data_buffer_ = reinterpret_cast<char*>(mmap_addr_) + mmap_metadata_page_->data_offset;
+  mmap_data_buffer_size_ = mmap_metadata_page_->data_size;
   return true;
 }
 
