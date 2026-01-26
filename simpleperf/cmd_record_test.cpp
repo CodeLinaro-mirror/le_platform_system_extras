@@ -1571,3 +1571,23 @@ TEST(record_cmd, child_process) {
                                 tmpfile.path, "sleep", SLEEP_SEC},
                                true));
 }
+
+// @CddTest = 6.1/C-0-2
+TEST(record_cmd, background_option) {
+  TemporaryFile tmpfile;
+  CaptureStdout capture;
+  ASSERT_TRUE(capture.Start());
+  ASSERT_TRUE(RecordCmd()->Run(
+      {"-o", tmpfile.path, "-e", GetDefaultEvent(), "--background", "sleep", "1"}));
+  std::string output = capture.Finish();
+  int pid = 0;
+  ASSERT_EQ(sscanf(output.c_str(), "%d", &pid), 1);
+  ASSERT_GT(pid, 0);
+  // Wait for the background process to finish.
+  sleep(2);
+  // Check if the file was created and has content.
+  std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(tmpfile.path);
+  ASSERT_TRUE(reader);
+  std::vector<std::unique_ptr<Record>> records = reader->DataSection();
+  ASSERT_GT(records.size(), 0U);
+}

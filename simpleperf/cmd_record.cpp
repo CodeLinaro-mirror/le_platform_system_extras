@@ -17,6 +17,7 @@
 #include <inttypes.h>
 #include <libgen.h>
 #include <signal.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/utsname.h>
@@ -330,6 +331,9 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
 "                                 to the perf event buffer (in milliseconds). Default is 100 ms.\n"
 "\n"
 "Other options:\n"
+"--background                  Run simpleperf in the background. Print simpleperf's pid and exit.\n"
+"                              Useful for profiling long-running services or when you don't want\n"
+"                              to block the terminal.\n"
 "--exit-with-parent            Stop recording when the thread starting simpleperf dies.\n"
 "--use-cmd-exit-code           Exit with the same exit code as the monitored cmdline.\n"
 "--start_profiling_fd fd_no    After starting profiling, write \"STARTED\" to\n"
@@ -367,7 +371,8 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
         allow_callchain_joiner_(true),
         callchain_joiner_min_matching_nodes_(1u),
         last_record_timestamp_(0u),
-        record_filter_(thread_tree_) {
+        record_filter_(thread_tree_),
+        background_(false) {
     // If we run `adb shell simpleperf record xxx` and stop profiling by ctrl-c, adb closes
     // sockets connecting simpleperf. After that, simpleperf will receive SIGPIPE when writing
     // to stdout/stderr, which is a problem when we use '--app' option. So ignore SIGPIPE to
@@ -390,6 +395,7 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   bool PrepareRecording(Workload* workload);
   bool DoRecording(Workload* workload);
   bool PostProcessRecording(const std::vector<std::string>& args);
+  bool ForkBackgroundProcess(int* exit_code);
   // pre recording functions
   bool TraceOffCpu();
   bool SetEventSelectionFlags();
@@ -494,6 +500,7 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   std::chrono::milliseconds etm_flush_interval_{kDefaultEtmDataFlushIntervalInMs};
 
   size_t compression_level_ = 0;
+  bool background_;
 };
 
 std::string RecordCommand::LongHelpString() const {
@@ -530,6 +537,9 @@ void RecordCommand::Run(const std::vector<std::string>& args, int* exit_code) {
   std::vector<std::string> workload_args;
   ProbeEvents probe_events(event_selection_set_);
   if (!ParseOptions(args, &workload_args, probe_events)) {
+    return;
+  }
+  if (background_ && ForkBackgroundProcess(exit_code)) {
     return;
   }
   if (!AdjustPerfEventLimit()) {
@@ -575,6 +585,24 @@ void RecordCommand::Run(const std::vector<std::string>& args, int* exit_code) {
   } else {
     *exit_code = 0;
   }
+}
+
+bool RecordCommand::ForkBackgroundProcess(int* exit_code) {
+  pid_t pid = fork();
+  if (pid == -1) {
+    PLOG(ERROR) << "fork() failed";
+    *exit_code = 1;
+    return true;
+  }
+  if (pid != 0) {
+    // In the parent process.
+    printf("%d\n", pid);
+    *exit_code = 0;
+    return true;
+  }
+  // In the child process.
+  signal(SIGHUP, SIG_IGN);
+  return false;
 }
 
 bool RecordCommand::PrepareRecording(Workload* workload) {
@@ -1028,6 +1056,8 @@ bool RecordCommand::ParseOptions(const std::vector<std::string>& args,
     }
     aux_buffer_size_ = static_cast<size_t>(v);
   }
+
+  background_ = options.PullBoolValue("--background");
 
   if (options.PullValue("-b")) {
     branch_sampling_ = branch_sampling_type_map["any"];
