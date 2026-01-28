@@ -31,8 +31,7 @@
     </test>
 
     <metrics_collector class="com.android.tradefed.device.metric.FilePullerLogCollector">
-        <option name="directory-keys" value="/data/local/tests/unrestricted/priority-inversion-demo/arm64/results/"/>
-        <option name="directory-keys" value="/data/local/tests/unrestricted/priority-inversion-demo/x86_64/results/"/>
+        <option name="directory-keys" value="/data/local/tests/unrestricted/priority-inversion-demo/results/"/>
         <option name="log-data-type" value="GZIP" />
         <option name="clean-up" value="true" />
         <option name="collect-on-run-ended-only" value="true" />

@@ -17,7 +17,9 @@ set -e
 
 TEST_RUNNING=./TEST.RUNNING.DELME
 CGRP_PATH=/dev/cpuctl
-OUTDIR=./results
+
+# output to parent dir, as our exec dir is arch specific
+OUTDIR=../results
 
 #HACK: make sure we're running in the same dir as the script
 cd -- "$(dirname -- "$0")"
