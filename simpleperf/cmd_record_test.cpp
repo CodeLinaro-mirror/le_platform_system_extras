@@ -1577,8 +1577,8 @@ TEST(record_cmd, background_option) {
   TemporaryFile tmpfile;
   CaptureStdout capture;
   ASSERT_TRUE(capture.Start());
-  ASSERT_TRUE(RecordCmd()->Run(
-      {"-o", tmpfile.path, "-e", GetDefaultEvent(), "--background", "sleep", "1"}));
+  ASSERT_TRUE(Workload::RunCmd({"/system/bin/simpleperf", "record", "-o", tmpfile.path, "-e",
+                                GetDefaultEvent(), "--background", "sleep", SLEEP_SEC}));
   std::string output = capture.Finish();
   int pid = 0;
   ASSERT_EQ(sscanf(output.c_str(), "%d", &pid), 1);
