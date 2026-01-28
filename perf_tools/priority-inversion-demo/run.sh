@@ -17,7 +17,10 @@ set -e
 
 TEST_RUNNING=./TEST.RUNNING.DELME
 
-CGRP_PATH=/sys/fs/cgroup
+CGRP_PATH=/dev/cpuctl
+
+#HACK: make sure we're running in the same dir as the script
+cd -- "$(dirname -- "$0")"
 
 cleanup () {
 	set +e
@@ -30,12 +33,8 @@ cleanup () {
 
 setup_once() {
 	if [ "${USER}" != "root" ]; then
+		echo User is $USER
 		echo "Please run with sudo"
-		exit
-	fi
-
-	VER=`stat -fc %T $CGRP_PATH/`
-	if [ "${VER}" != "cgroup2fs" ] ; then
 		exit -1
 	fi
 
@@ -53,10 +52,10 @@ setup () {
 	touch ./a/background
 
 	mkdir $CGRP_PATH/medium
-	echo "512" > $CGRP_PATH/medium/cpu.weight
+	echo "512" > $CGRP_PATH/medium/cpu.shares
 
 	mkdir $CGRP_PATH/low
-	echo "4" > $CGRP_PATH/low/cpu.weight
+	echo "4" > $CGRP_PATH/low/cpu.shares
 
 }
 
