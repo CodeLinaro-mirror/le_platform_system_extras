@@ -16,8 +16,8 @@
 set -e
 
 TEST_RUNNING=./TEST.RUNNING.DELME
-
 CGRP_PATH=/dev/cpuctl
+OUTDIR=./results
 
 #HACK: make sure we're running in the same dir as the script
 cd -- "$(dirname -- "$0")"
@@ -41,6 +41,7 @@ setup_once() {
 	echo 1 > /sys/kernel/tracing/tracing_on
 
 	cleanup
+	mkdir -p $OUTDIR
 }
 
 setup () {
@@ -100,7 +101,7 @@ run_test () {
 	fi
 
 
-	./rename-test -p ./a/foreground ./b/foreground > $OUT &
+	./rename-test -p ./a/foreground ./b/foreground > $OUTDIR/$OUT &
 	FOREGROUND_PID=$!
 
 	echo "I|$$|Test Begins" > /sys/kernel/tracing/trace_marker
@@ -115,9 +116,9 @@ run_test () {
 	fi
 	rm -f $TEST_RUNNING
 
-	sort -n -o $OUT $OUT
-	rm -f $OUT.gz
-	gzip $OUT
+	sort -n -o $OUTDIR/$OUT $OUTDIR/$OUT
+	rm -f $OUTDIR/$OUT.gz
+	gzip $OUTDIR/$OUT
 	cleanup
 }
 
