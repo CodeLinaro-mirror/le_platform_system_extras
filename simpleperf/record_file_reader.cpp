@@ -382,18 +382,22 @@ std::unique_ptr<char[]> RecordFileReader::ReadRecordWithDecompression(ReadPos& p
       if (output.size() >= sizeof(perf_event_header)) {
         auto header = reinterpret_cast<const perf_event_header*>(output.data());
         if (header->size <= output.size()) {
-          std::unique_ptr<char[]> p(new char[header->size]);
+          auto p = std::make_unique<char[]>(header->size);
           memcpy(p.get(), output.data(), header->size);
           decompressor_->ConsumeOutputData(header->size);
           return p;
         }
       }
     }
-    if (pos.pos == pos.end) {
-      break;
+    if (pos.pos >= pos.end) {
+      return nullptr;
     }
     perf_event_header header;
     if (!Read(&header, sizeof(header))) {
+      return nullptr;
+    }
+    if (header.size < sizeof(header)) {
+      LOG(ERROR) << "invalid record size " << header.size << " in " << filename_;
       return nullptr;
     }
     pos.pos += header.size;
@@ -412,7 +416,7 @@ std::unique_ptr<char[]> RecordFileReader::ReadRecordWithDecompression(ReadPos& p
         return nullptr;
       }
     } else {
-      std::unique_ptr<char[]> p(new char[header.size]);
+      auto p = std::make_unique<char[]>(header.size);
       memcpy(p.get(), &header, sizeof(header));
       if (!Read(p.get() + sizeof(header), header.size - sizeof(header))) {
         return nullptr;
