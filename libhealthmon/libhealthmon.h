@@ -34,7 +34,14 @@
 #define CMD_LOGDETAIL   "grep 'log_size' /etc/config/system"
 #define CMD_OSDETAIL    "cat /etc/os-release"
 #define CMD_RLOG    "dmesg -c"
+
+#ifdef FEATURE_PRPLWRT
+#define CMD_SLOG       "service tr181-syslog restart"
+#define CMD_CLEAR_SLOG ":> /var/log/messages"
+#else
 #define CMD_SLOG    "service log restart"
+#endif
+
 #define BUFFLEN  400
 #define DEBUG 0
 

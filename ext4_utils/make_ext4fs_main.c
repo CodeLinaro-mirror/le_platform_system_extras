@@ -85,7 +85,9 @@ int main(int argc, char **argv)
 	struct selabel_handle *sehnd = NULL;
 	FILE* block_list_file = NULL;
 #ifndef USE_MINGW
+#ifdef SELINUX_MODE
 	struct selinux_opt seopts[] = { { SELABEL_OPT_PATH, "" } };
+#endif
 #endif
 
 	while ((opt = getopt(argc, argv, "l:j:b:g:i:I:L:a:S:T:C:B:fwzJsctvu")) != -1) {
@@ -140,12 +142,14 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 #ifndef USE_MINGW
+#ifdef SELINUX_MODE
 			seopts[0].value = optarg;
 			sehnd = selabel_open(SELABEL_CTX_FILE, seopts, 1);
 			if (!sehnd) {
 				perror(optarg);
 				exit(EXIT_FAILURE);
 			}
+#endif
 #endif
 			break;
 		case 'v':
