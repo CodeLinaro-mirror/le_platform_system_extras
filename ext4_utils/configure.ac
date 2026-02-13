@@ -29,6 +29,12 @@ PKG_CHECK_MODULES([LIBSPARSE], [libsparse])
 AC_SUBST([LIBSPARSE_CFLAGS])
 AC_SUBST([LIBSPARSE_LIBS])
 
+AC_ARG_ENABLE(selinux-mode,
+      AC_HELP_STRING([--disable-selinux-mode], 
+         [Disable selinux for ext4_utils]),
+         [selinux_mode=${enableval}], [selinux_mode="yes"])
+AM_CONDITIONAL(SELINUX_MODE, [test "x${selinux_mode}" = "xyes"])
+
 AS_CASE([$host],
         [arm*], [ARM=yes],
         [ARM=no]
