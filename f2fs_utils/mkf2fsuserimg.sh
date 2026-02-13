@@ -24,6 +24,7 @@ MKFS_OPTS=""
 SLOAD_OPTS=""
 BLOCK_MAP_FILE=""
 BLOCK_MAP_OPT=""
+SRC_DIR=""
 
 if [ $# -lt 2 ]; then
   usage
@@ -48,6 +49,7 @@ if [[ "$1" == "-C" ]]; then
   shift; shift
 fi
 if [[ "$1" == "-f" ]]; then
+  SRC_DIR="$2"
   SLOAD_OPTS+=" -f $2"
   shift; shift
 fi
@@ -178,6 +180,10 @@ function _build()
       rm -f $OUTPUT_FILE
     fi
     exit 4
+  fi
+
+  if [ -n "$SRC_DIR" ] && [ -d "$SRC_DIR" ] && [ -z "$(ls -A "$SRC_DIR")" ]; then
+    SLOAD_OPTS=$(echo "$SLOAD_OPTS" | sed -E 's/-s [^ ]+//')
   fi
 
   SLOAD_F2FS_CMD="sload_f2fs $SLOAD_OPTS $OUTPUT_FILE"
