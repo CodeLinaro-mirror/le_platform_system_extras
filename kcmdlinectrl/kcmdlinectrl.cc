@@ -108,14 +108,14 @@ int StoreProperty(const char* property_name, const char* new_value) {
 
   if (!strcmp(property_name, "binder")) {
     if (!strcmp(new_value, "rust")) {
-      m.kcmdline_flags &= !MISC_KCMDLINE_BINDER_FORCE_C;
+      m.kcmdline_flags &= ~MISC_KCMDLINE_BINDER_FORCE_C;
       m.kcmdline_flags |= MISC_KCMDLINE_BINDER_FORCE_RUST;
     } else if (!strcmp(new_value, "c")) {
-      m.kcmdline_flags &= !MISC_KCMDLINE_BINDER_FORCE_RUST;
+      m.kcmdline_flags &= ~MISC_KCMDLINE_BINDER_FORCE_RUST;
       m.kcmdline_flags |= MISC_KCMDLINE_BINDER_FORCE_C;
     } else if (!strcmp(new_value, "unset")) {
-      m.kcmdline_flags &= !MISC_KCMDLINE_BINDER_FORCE_RUST;
-      m.kcmdline_flags &= !MISC_KCMDLINE_BINDER_FORCE_C;
+      m.kcmdline_flags &= ~MISC_KCMDLINE_BINDER_FORCE_RUST;
+      m.kcmdline_flags &= ~MISC_KCMDLINE_BINDER_FORCE_C;
     } else {
       LOG(ERROR) << "Binder property can only be 'c' or 'rust', but got " << new_value;
       return 1;
