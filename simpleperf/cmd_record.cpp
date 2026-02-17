@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#include <fcntl.h>
 #include <inttypes.h>
 #include <libgen.h>
 #include <signal.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/utsname.h>
@@ -330,6 +332,9 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
 "                                 to the perf event buffer (in milliseconds). Default is 100 ms.\n"
 "\n"
 "Other options:\n"
+"--background                  Run simpleperf in the background. Print simpleperf's pid and exit.\n"
+"                              Useful for profiling long-running services or when you don't want\n"
+"                              to block the terminal.\n"
 "--exit-with-parent            Stop recording when the thread starting simpleperf dies.\n"
 "--use-cmd-exit-code           Exit with the same exit code as the monitored cmdline.\n"
 "--start_profiling_fd fd_no    After starting profiling, write \"STARTED\" to\n"
@@ -367,7 +372,8 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
         allow_callchain_joiner_(true),
         callchain_joiner_min_matching_nodes_(1u),
         last_record_timestamp_(0u),
-        record_filter_(thread_tree_) {
+        record_filter_(thread_tree_),
+        background_(false) {
     // If we run `adb shell simpleperf record xxx` and stop profiling by ctrl-c, adb closes
     // sockets connecting simpleperf. After that, simpleperf will receive SIGPIPE when writing
     // to stdout/stderr, which is a problem when we use '--app' option. So ignore SIGPIPE to
@@ -390,6 +396,7 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   bool PrepareRecording(Workload* workload);
   bool DoRecording(Workload* workload);
   bool PostProcessRecording(const std::vector<std::string>& args);
+  bool ForkBackgroundProcess(int* exit_code);
   // pre recording functions
   bool TraceOffCpu();
   bool SetEventSelectionFlags();
@@ -426,7 +433,6 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   bool DumpDebugUnwindFeature(const std::unordered_set<Dso*>& dso_set);
   void CollectHitFileInfo(const SampleRecord& r, std::unordered_set<Dso*>* dso_set);
   bool DumpETMBranchListFeature();
-  bool DumpInitMapFeature();
 
   bool system_wide_collection_;
   uint64_t branch_sampling_;
@@ -485,7 +491,6 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   RecordFilter record_filter_;
 
   std::optional<MapRecordReader> map_record_reader_;
-  std::optional<MapRecordThread> map_record_thread_;
 
   std::unordered_map<std::string, std::string> extra_meta_info_;
   bool use_cmd_exit_code_ = false;
@@ -496,6 +501,7 @@ RECORD_FILTER_OPTION_HELP_MSG_FOR_RECORDING
   std::chrono::milliseconds etm_flush_interval_{kDefaultEtmDataFlushIntervalInMs};
 
   size_t compression_level_ = 0;
+  bool background_;
 };
 
 std::string RecordCommand::LongHelpString() const {
@@ -532,6 +538,9 @@ void RecordCommand::Run(const std::vector<std::string>& args, int* exit_code) {
   std::vector<std::string> workload_args;
   ProbeEvents probe_events(event_selection_set_);
   if (!ParseOptions(args, &workload_args, probe_events)) {
+    return;
+  }
+  if (background_ && ForkBackgroundProcess(exit_code)) {
     return;
   }
   if (!AdjustPerfEventLimit()) {
@@ -577,6 +586,32 @@ void RecordCommand::Run(const std::vector<std::string>& args, int* exit_code) {
   } else {
     *exit_code = 0;
   }
+}
+
+bool RecordCommand::ForkBackgroundProcess(int* exit_code) {
+  pid_t pid = fork();
+  if (pid == -1) {
+    PLOG(ERROR) << "fork() failed";
+    *exit_code = 1;
+    return true;
+  }
+  if (pid != 0) {
+    // In the parent process.
+    printf("%d\n", pid);
+    *exit_code = 0;
+    return true;
+  }
+  // In the child process.
+  signal(SIGHUP, SIG_IGN);
+  setsid();
+  int null_fd = open("/dev/null", O_RDWR);
+  if (null_fd != -1) {
+    dup2(null_fd, STDIN_FILENO);
+    dup2(null_fd, STDOUT_FILENO);
+    dup2(null_fd, STDERR_FILENO);
+    close(null_fd);
+  }
+  return false;
 }
 
 bool RecordCommand::PrepareRecording(Workload* workload) {
@@ -691,9 +726,9 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
     }
     record_buffer_size = default_size.value();
   }
-  if (!event_selection_set_.MmapEventFiles(mmap_page_range_.first, mmap_page_range_.second,
-                                           aux_buffer_size_, record_buffer_size,
-                                           allow_truncating_samples_, exclude_perf_)) {
+  if (!event_selection_set_.MmapEventFiles(
+          mmap_page_range_.first, mmap_page_range_.second, aux_buffer_size_, record_buffer_size,
+          allow_truncating_samples_, exclude_perf_, etm_flush_interval_)) {
     return false;
   }
   auto callback = std::bind(&RecordCommand::ProcessRecord, this, std::placeholders::_1);
@@ -1030,6 +1065,8 @@ bool RecordCommand::ParseOptions(const std::vector<std::string>& args,
     }
     aux_buffer_size_ = static_cast<size_t>(v);
   }
+
+  background_ = options.PullBoolValue("--background");
 
   if (options.PullValue("-b")) {
     branch_sampling_ = branch_sampling_type_map["any"];
@@ -1473,6 +1510,13 @@ bool RecordCommand::SetEventSelectionFlags() {
   if (clockid_ != "perf") {
     event_selection_set_.SetClockId(clockid_map[clockid_]);
   }
+  if (system_wide_collection_ && event_selection_set_.HasAuxTrace()) {
+    if (!IsSwitchRecordSupported()) {
+      LOG(WARNING) << "Kernel version is too low to get maps for system wide ETM recording";
+    }
+    // Enable switch records to know for which processes we should dump maps.
+    event_selection_set_.EnableSwitchRecord();
+  }
   return true;
 }
 
@@ -1549,27 +1593,13 @@ bool RecordCommand::DumpTracingData() {
 }
 
 bool RecordCommand::DumpMaps() {
-  if (system_wide_collection_) {
-    // For system wide recording:
-    //   If not aux tracing, only dump kernel maps. Maps of a process is dumped when needed (the
-    //   first time a sample hits that process).
-    //   If aux tracing with decoding etm data, the maps are dumped by etm_branch_list_generator.
-    //   If aux tracing without decoding etm data, we don't know which maps will be needed, so dump
-    //   all process maps. To reduce pre recording time, we dump process maps in map record thread
-    //   while recording.
-    if (event_selection_set_.HasAuxTrace() && !etm_branch_list_generator_) {
-      const char* binary_name_pattern =
-          binary_name_regex_ ? binary_name_regex_->GetPattern().c_str() : nullptr;
-      map_record_thread_.emplace(*map_record_reader_, binary_name_pattern);
-      return true;
-    }
-    if (!event_selection_set_.ExcludeKernel()) {
-      return map_record_reader_->ReadKernelMaps();
-    }
-    return true;
-  }
   if (!event_selection_set_.ExcludeKernel() && !map_record_reader_->ReadKernelMaps()) {
     return false;
+  }
+  if (system_wide_collection_) {
+    // For system wide recording, maps of a process is dumped when needed. It happens the first time
+    // a sample or a SwitchCpuWideRecord (for ETM tracing) hits that process.
+    return true;
   }
   // Map from process id to a set of thread ids in that process.
   std::unordered_map<pid_t, std::unordered_set<pid_t>> process_map;
@@ -1657,18 +1687,35 @@ bool RecordCommand::ShouldOmitRecord(Record* record) {
     // entries for unwinding, as in http://b/77236599. So it is better to remove
     // dalvik-jit-code-cache and other maps that only exist in memory.
     switch (record->type()) {
-      case PERF_RECORD_MMAP:
-        return MapOnlyExistInMemory(static_cast<MmapRecord*>(record));
-      case PERF_RECORD_MMAP2:
-        return MapOnlyExistInMemory(static_cast<Mmap2Record*>(record));
+      case PERF_RECORD_MMAP: {
+        if (MapOnlyExistInMemory(static_cast<MmapRecord*>(record))) {
+          return true;
+        }
+        break;
+      }
+      case PERF_RECORD_MMAP2: {
+        if (MapOnlyExistInMemory(static_cast<Mmap2Record*>(record))) {
+          return true;
+        }
+        break;
+      }
+    }
+  }
+  if (binary_name_regex_) {
+    // Remove unnecessary maps for ETM data. Only filter user-space maps based on binary name.
+    // Kernel maps are small enough to be always kept. User space maps should all use Mmap2Records.
+    if (record->type() == PERF_RECORD_MMAP2) {
+      const auto& r = static_cast<const Mmap2Record&>(*record);
+      if (!binary_name_regex_->Search(r.filename)) {
+        return true;
+      }
     }
   }
   return false;
 }
 
 bool RecordCommand::DumpMapsForRecord(Record* record) {
-  if (record->type() == PERF_RECORD_SAMPLE) {
-    pid_t pid = static_cast<SampleRecord*>(record)->tid_data.pid;
+  auto dump_maps_for_process = [&](pid_t pid) {
     if (dumped_processes_.find(pid) == dumped_processes_.end()) {
       // Dump map info and all thread names for that process.
       if (!map_record_reader_->ReadProcessMaps(pid, last_record_timestamp_)) {
@@ -1676,6 +1723,14 @@ bool RecordCommand::DumpMapsForRecord(Record* record) {
       }
       dumped_processes_.insert(pid);
     }
+    return true;
+  };
+  if (record->type() == PERF_RECORD_SAMPLE) {
+    pid_t pid = static_cast<SampleRecord*>(record)->tid_data.pid;
+    return dump_maps_for_process(pid);
+  } else if (record->type() == PERF_RECORD_SWITCH_CPU_WIDE) {
+    pid_t pid = static_cast<SwitchCpuWideRecord*>(record)->tid_data.pid;
+    return dump_maps_for_process(pid);
   }
   return true;
 }
@@ -1758,9 +1813,9 @@ bool RecordCommand::ProcessJITDebugInfo(std::vector<JITDebugInfo> debug_info,
     }
   }
   // We want to let samples see the most recent JIT maps generated before them, but no JIT maps
-  // generated after them. So process existing samples each time generating new JIT maps. We prefer
-  // to process samples after processing JIT maps. Because some of the samples may hit the new JIT
-  // maps, and we want to report them properly.
+  // generated after them. So process existing samples each time generating new JIT maps. We
+  // prefer to process samples after processing JIT maps. Because some of the samples may hit the
+  // new JIT maps, and we want to report them properly.
   if (sync_kernel_records && !event_selection_set_.SyncKernelBuffer()) {
     return false;
   }
@@ -1772,8 +1827,8 @@ bool RecordCommand::ProcessControlCmd(IOEventLoop* loop) {
   size_t line_length = 0;
   if (getline(&line, &line_length, stdin) == -1) {
     free(line);
-    // When the simpleperf Java API destroys the simpleperf process, it also closes the stdin pipe.
-    // So we may see EOF of stdin.
+    // When the simpleperf Java API destroys the simpleperf process, it also closes the stdin
+    // pipe. So we may see EOF of stdin.
     return loop->ExitLoop();
   }
   std::string cmd = android::base::Trim(line);
@@ -1869,8 +1924,8 @@ bool RecordCommand::UnwindRecord(SampleRecord& r) {
                                             r.GetValidStackSize(), &ips, &sps)) {
       return false;
     }
-    // The unwinding may fail if JIT debug info isn't the latest. In this case, read JIT debug info
-    // from the process and retry unwinding.
+    // The unwinding may fail if JIT debug info isn't the latest. In this case, read JIT debug
+    // info from the process and retry unwinding.
     if (jit_debug_reader_ && !post_unwind_ &&
         offline_unwinder_->IsCallChainBrokenForIncompleteJITDebugInfo()) {
       jit_debug_reader_->ReadProcess(r.tid_data.pid);
@@ -1920,9 +1975,9 @@ std::unique_ptr<RecordFileReader> RecordCommand::MoveRecordFile(const std::strin
   std::filesystem::rename(record_filename_, old_filename, ec);
   if (ec) {
     LOG(DEBUG) << "Failed to rename: " << ec.message();
-    // rename() fails on Android N x86 emulator, which uses kernel 3.10. Because rename() in bionic
-    // uses renameat2 syscall, which isn't support on kernel < 3.15. So add a fallback to mv
-    // command. The mv command can also work with other situations when rename() doesn't work.
+    // rename() fails on Android N x86 emulator, which uses kernel 3.10. Because rename() in
+    // bionic uses renameat2 syscall, which isn't support on kernel < 3.15. So add a fallback to
+    // mv command. The mv command can also work with other situations when rename() doesn't work.
     // So we'd like to keep it as a fallback to rename().
     if (!Workload::RunCmd({"mv", record_filename_, old_filename})) {
       return nullptr;
@@ -2054,17 +2109,6 @@ bool RecordCommand::DumpAdditionalFeatures(const std::vector<std::string>& args)
     }
   };
 
-  if (map_record_thread_) {
-    if (!map_record_thread_->Join()) {
-      return false;
-    }
-    // If not dumping build id, we only need to read kernel maps, to dump kernel module addresses
-    // in file feature section.
-    if (!map_record_thread_->ReadMapRecords(callback, !dump_build_id_)) {
-      return false;
-    }
-  }
-
   // We don't need to read data section when recording ETM data and not need to dump build ids.
   bool read_data_section = true;
   if (event_selection_set_.HasAuxTrace() && !dump_build_id_) {
@@ -2089,9 +2133,6 @@ bool RecordCommand::DumpAdditionalFeatures(const std::vector<std::string>& args)
     feature_count += 2;
   }
   if (etm_branch_list_generator_) {
-    feature_count++;
-  }
-  if (map_record_thread_) {
     feature_count++;
   }
   if (!record_file_writer_->BeginWriteFeatures(feature_count)) {
@@ -2139,9 +2180,6 @@ bool RecordCommand::DumpAdditionalFeatures(const std::vector<std::string>& args)
   if (etm_branch_list_generator_ && !DumpETMBranchListFeature()) {
     return false;
   }
-  if (map_record_thread_ && !DumpInitMapFeature()) {
-    return false;
-  }
 
   if (!record_file_writer_->EndWriteFeatures()) {
     return false;
@@ -2168,9 +2206,9 @@ bool RecordCommand::DumpBuildIdFeature() {
     }
   }
   if (event_selection_set_.HasAuxTrace()) {
-    // If [vdso]->GetDebugFilePath() exists, copy it to "./vdso.so". If it does exist, the build id
-    // of [vdso] was read out from it, and [vdso] itself was already added to the vector in the loop
-    // above.
+    // If [vdso]->GetDebugFilePath() exists, copy it to "./vdso.so". If it does exist, the build
+    // id of [vdso] was read out from it, and [vdso] itself was already added to the vector in the
+    // loop above.
     constexpr uint64_t force_64bit = (sizeof(size_t) == sizeof(uint64_t)) ? 1ULL << 32 : 1;
     Dso* vdso = thread_tree_.FindUserDsoOrNew("[vdso]", force_64bit);
     if (std::filesystem::exists(vdso->GetDebugFilePath())) {
@@ -2316,17 +2354,6 @@ bool RecordCommand::DumpETMBranchListFeature() {
   }
   return record_file_writer_->WriteFeature(PerfFileFormat::FEAT_ETM_BRANCH_LIST, s.data(),
                                            s.size());
-}
-
-bool RecordCommand::DumpInitMapFeature() {
-  if (!map_record_thread_->Join()) {
-    return false;
-  }
-  auto callback = [&](const char* data, size_t size) {
-    return record_file_writer_->WriteInitMapFeature(data, size);
-  };
-  return map_record_thread_->ReadMapRecordData(callback) &&
-         record_file_writer_->FinishWritingInitMapFeature();
 }
 
 }  // namespace

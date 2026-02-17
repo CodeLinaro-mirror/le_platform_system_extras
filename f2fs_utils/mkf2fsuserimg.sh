@@ -10,6 +10,7 @@ ${0##*/} OUTPUT_FILE SIZE
          [-s FILE_CONTEXTS] [-t MOUNT_POINT] [-T TIMESTAMP] [-B block_map]
          [-L LABEL] [--prjquota] [--casefold] [--compression] [--readonly]
          [--sldc <num> [sload compression sub-options]] [-b <block_size>]
+         [--packed_ssa]
 <num>: number of the sload compression args, e.g.  -a LZ4 counts as 2
        when sload compression args are not given, <num> must be 0,
        and the default flags will be used.
@@ -141,6 +142,11 @@ if [[ "$1" == "-b" ]]; then
   shift
   MKFS_OPTS+=" -b $BLOCKSIZE"
   MKFS_OPTS+=" -w $BLOCKSIZE"
+fi
+
+if [[ "$1" == "--packed_ssa" ]]; then
+  MKFS_OPTS+=" -O packed_ssa"
+  shift;
 fi
 
 if [ -z $SIZE ]; then

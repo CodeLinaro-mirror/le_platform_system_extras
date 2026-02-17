@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <filesystem>
@@ -1173,54 +1174,67 @@ TEST(record_cmd, addr_filter_option) {
     GTEST_LOG_(INFO) << "Omit this test since etm isn't supported on this device";
     return;
   }
-  FILE* fp = popen("which sleep", "r");
-  ASSERT_TRUE(fp != nullptr);
-  std::string path;
-  ASSERT_TRUE(android::base::ReadFdToString(fileno(fp), &path));
-  pclose(fp);
-  path = android::base::Trim(path);
-  std::string sleep_exec_path;
-  ASSERT_TRUE(Realpath(path, &sleep_exec_path));
+  // 1. Run sleep command, read its /proc/<pid>/maps, check which linker is it using.
+  std::string linker_path;
+  std::unique_ptr<Workload> workload = Workload::CreateWorkload({"sleep", "5"});
+  ASSERT_TRUE(workload != nullptr);
+  ASSERT_TRUE(workload->Start());
+  // Sleep for a while to let the child process finish execvp().
+  usleep(200000);
+  std::vector<ThreadMmap> maps;
+  ASSERT_TRUE(GetThreadMmapsInProcess(workload->GetPid(), &maps));
+  for (const auto& map : maps) {
+    if ((map.prot & PROT_EXEC) && map.name.find("linker") != std::string::npos &&
+        android::base::StartsWith(map.name, "/")) {
+      linker_path = map.name;
+      break;
+    }
+  }
+  ASSERT_FALSE(linker_path.empty());
+
+  // 2. Use Realpath() to get the executable path of the linker used by sleep command.
+  std::string linker_exec_path;
+  ASSERT_TRUE(Realpath(linker_path, &linker_exec_path));
+
   // --addr-filter doesn't apply to cpu-cycles.
-  ASSERT_FALSE(RunRecordCmd({"--addr-filter", "filter " + sleep_exec_path}));
+  ASSERT_FALSE(RunRecordCmd({"--addr-filter", "filter " + linker_exec_path}));
+
+  // 3. Start a new sleep command, do ETM record and inject. Check if linker_path is in the data.
   TemporaryFile record_file;
-  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", "filter " + sleep_exec_path},
+  ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", "filter " + linker_exec_path},
                            record_file.path));
   TemporaryFile inject_file;
   ASSERT_TRUE(
       CreateCommandInstance("inject")->Run({"-i", record_file.path, "-o", inject_file.path}));
   std::string data;
   ASSERT_TRUE(android::base::ReadFileToString(inject_file.path, &data));
-  // Trace should ideally be limited to sleep_exec_path. However, due to potential early child
-  // command execution before filter setup, some other binary ETM data might exist. Thus, only
-  // checking for the presence of sleep_exec_path traces.
-  bool seen_sleep = false;
+
+  // 4. Use linker_path to replace sleep_exec_path to make the test not flaky.
+  // The linker is always executed during process startup and provides consistent
+  // instruction flow, making it a reliable target for ETM traces.
+  bool seen_linker = false;
   for (auto& line : android::base::Split(data, "\n")) {
-    if (android::base::StartsWith(line, "// ")) {
-      if (android::base::StartsWith(line, "// build_id: ")) {
-        continue;
-      }
-      std::string dso = line.substr(strlen("// "), sleep_exec_path.size());
-      if (dso == sleep_exec_path) {
-        seen_sleep = true;
-      }
+    if (android::base::StartsWith(line, "// ") &&
+        line.find(linker_exec_path) != std::string::npos) {
+      seen_linker = true;
+      break;
     }
   }
-  ASSERT_TRUE(seen_sleep);
+  ASSERT_TRUE(seen_linker);
 
   // Test if different filter types are accepted by the kernel.
-  auto elf = ElfFile::Open(sleep_exec_path);
+  auto elf = ElfFile::Open(linker_exec_path);
   uint64_t off;
   uint64_t addr = elf->ReadMinExecutableVaddr(&off);
   // file start
-  std::string filter = StringPrintf("start 0x%" PRIx64 "@%s", addr, sleep_exec_path.c_str());
+  std::string filter = StringPrintf("start 0x%" PRIx64 "@%s", addr, linker_exec_path.c_str());
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // file stop
-  filter = StringPrintf("stop 0x%" PRIx64 "@%s", addr, sleep_exec_path.c_str());
+  filter = StringPrintf("stop 0x%" PRIx64 "@%s", addr, linker_exec_path.c_str());
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // file range
   filter = StringPrintf("filter 0x%" PRIx64 "-0x%" PRIx64 "@%s", addr, addr + 4,
-                        sleep_exec_path.c_str());
+                        linker_exec_path.c_str());
   ASSERT_TRUE(RunRecordCmd({"-e", "cs-etm:u", "--addr-filter", filter}));
   // If kernel panic, try backporting "perf/core: Fix crash when using HW tracing kernel
   // filters".
@@ -1570,4 +1584,24 @@ TEST(record_cmd, child_process) {
   ASSERT_TRUE(Workload::RunCmd({"/system/bin/simpleperf", "record", "-e", GetDefaultEvent(), "-o",
                                 tmpfile.path, "sleep", SLEEP_SEC},
                                true));
+}
+
+// @CddTest = 6.1/C-0-2
+TEST(record_cmd, background_option) {
+  TemporaryFile tmpfile;
+  CaptureStdout capture;
+  ASSERT_TRUE(capture.Start());
+  ASSERT_TRUE(Workload::RunCmd({"/system/bin/simpleperf", "record", "-o", tmpfile.path, "-e",
+                                GetDefaultEvent(), "--background", "sleep", SLEEP_SEC}));
+  std::string output = capture.Finish();
+  int pid = 0;
+  ASSERT_EQ(sscanf(output.c_str(), "%d", &pid), 1);
+  ASSERT_GT(pid, 0);
+  // Wait for the background process to finish.
+  sleep(2);
+  // Check if the file was created and has content.
+  std::unique_ptr<RecordFileReader> reader = RecordFileReader::CreateInstance(tmpfile.path);
+  ASSERT_TRUE(reader);
+  std::vector<std::unique_ptr<Record>> records = reader->DataSection();
+  ASSERT_GT(records.size(), 0U);
 }

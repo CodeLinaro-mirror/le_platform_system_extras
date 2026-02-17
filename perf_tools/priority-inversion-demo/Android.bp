@@ -1,4 +1,5 @@
-// Copyright (C) 2022 The Android Open Source Project
+//
+// Copyright (C) 2026 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,33 +12,33 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
 
 package {
     default_applicable_licenses: ["Android-Apache-2.0"],
+    default_team: "trendy_team_android_kernel",
 }
 
 cc_binary {
-    name: "kcmdlinectrl",
-    srcs: ["kcmdlinectrl.cc"],
-    shared_libs: [
-        "libbootloader_message",
-        "libbase",
-        "lib_com_android_kcmdline_cc_flags",
+    name: "rename-test",
+    srcs: ["rename-test.c"],
+    cflags: [
+        "-g",
+        "-Wall",
+        "-Werror",
+        "-Wno-missing-field-initializers",
+        "-Wno-sign-compare",
     ],
-    init_rc: ["kcmdlinectrl.rc"],
+    static_executable: true,
 }
 
-aconfig_declarations {
-    name: "kcmdline_flags",
-    package: "com.android.kcmdline",
-    container: "system",
-    srcs: [
-        "kcmdline.aconfig",
-    ],
-}
-
-cc_aconfig_library {
-    name: "lib_com_android_kcmdline_cc_flags",
-    aconfig_declarations: "kcmdline_flags",
-    visibility: ["//system/extras/kcmdlinectrl:__pkg__"],
+sh_test {
+    name: "priority-inversion-demo",
+    src: "run.sh",
+    data: [":rename-test"],
+    test_config: "AndroidTest.xml",
+    device_supported: true,
+    host_supported: false,
+    require_root: true,
+    test_suites: ["device-tests"],
 }
