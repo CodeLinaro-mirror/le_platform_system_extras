@@ -507,6 +507,7 @@ cc_library_shared {
     },
     srcs: [
         "report_lib_interface.cpp",
+        "report_utils_interface.cpp",
     ],
     static_libs: ["libsimpleperf"],
 
