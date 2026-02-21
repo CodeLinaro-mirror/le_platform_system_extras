@@ -393,8 +393,9 @@ class ETMPerfDataReader : public PerfDataReader {
       return;
     }
 
-    auto& branch_map = etm_binary_map_[branch_list.dso].branch_map;
-    ++branch_map[branch_list.addr][branch_list.branch];
+    auto& binary = etm_binary_map_[branch_list.dso];
+    auto& branch_map = binary.branch_map;
+    ++branch_map[branch_list.addr][binary.GetBranch(branch_list.branch)];
   }
 
   void ProcessETMBinary() {
