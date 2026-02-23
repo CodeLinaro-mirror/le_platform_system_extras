@@ -964,8 +964,13 @@ def collect_events(search_events, command, timings, stop_events,
 
 
 def fetch_boottime_property():
+  # TODO: b/485123734 - use bootstat to get boot timings instead of getprop
   cmd = f"{_ADB_CMD} shell su root getprop"
   events = {}
+  bootloader_times_to_ignore = [
+      "SW",
+      "splash",
+  ]
   process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
   out = process.stdout
   pattern = re.compile(r"\[ro\.boottime\.([^\]]+)\]:\s+\[(\d+)\]")
@@ -986,7 +991,7 @@ def fetch_boottime_property():
         entry_pair = item.split(":")
         entry_name = entry_pair[0]
         time_spent = float(entry_pair[1]) / 1000 #ms to s
-        if entry_name != "SW":
+        if entry_name not in bootloader_times_to_ignore:
           bootloader_time = bootloader_time + time_spent
   ordered_event = collections.OrderedDict()
   if bootloader_time != 0.0:
