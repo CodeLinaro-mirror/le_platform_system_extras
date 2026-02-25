@@ -29,6 +29,7 @@
 
 #include "ETMRecorder.h"
 #include "RegEx.h"
+#include "SPERecorder.h"
 #include "command.h"
 #include "environment.h"
 #include "event_attr.h"
@@ -348,7 +349,7 @@ class ListCommand : public Command {
   ListCommand()
       : Command("list", "list available event types",
                 // clang-format off
-"Usage: simpleperf list [options] [hw|sw|cache|raw|tracepoint|pmu]\n"
+"Usage: simpleperf list [options] [hw|sw|cache|raw|tracepoint|arm_spe|pmu]\n"
 "       List all available event types.\n"
 "       Filters can be used to show only event types belong to selected types:\n"
 "         hw          hardware events\n"
@@ -357,6 +358,7 @@ class ListCommand : public Command {
 "         raw         raw cpu pmu events\n"
 "         tracepoint  tracepoint events\n"
 "         cs-etm      coresight etm instruction tracing events\n"
+"         arm_spe     arm statistical profiling extension\n"
 "         pmu         system-specific pmu events\n"
 "Options:\n"
 "--show-features    Show features supported on the device, including:\n"
@@ -377,28 +379,25 @@ bool ListCommand::Run(const std::vector<std::string>& args) {
   }
 
   static std::map<std::string, std::pair<std::string, std::function<bool(const EventType&)>>>
-      type_map = {
-          {"hw",
-           {"hardware events", [](const EventType& e) { return e.type == PERF_TYPE_HARDWARE; }}},
-          {"sw",
-           {"software events", [](const EventType& e) { return e.type == PERF_TYPE_SOFTWARE; }}},
-          {"cache",
-           {"hw-cache events", [](const EventType& e) { return e.type == PERF_TYPE_HW_CACHE; }}},
-          {"raw",
-           {"raw events provided by cpu pmu",
-            [](const EventType& e) { return e.type == PERF_TYPE_RAW; }}},
-          {"tracepoint",
-           {"tracepoint events",
-            [](const EventType& e) { return e.type == PERF_TYPE_TRACEPOINT; }}},
+      type_map =
+  { {"hw", {"hardware events", [](const EventType& e) { return e.type == PERF_TYPE_HARDWARE; }}},
+    {"sw", {"software events", [](const EventType& e) { return e.type == PERF_TYPE_SOFTWARE; }}},
+    {"cache", {"hw-cache events", [](const EventType& e) { return e.type == PERF_TYPE_HW_CACHE; }}},
+    {"raw",
+     {"raw events provided by cpu pmu",
+      [](const EventType& e) { return e.type == PERF_TYPE_RAW; }}},
+    {"tracepoint",
+     {"tracepoint events", [](const EventType& e) { return e.type == PERF_TYPE_TRACEPOINT; }}},
 #if defined(__arm__) || defined(__aarch64__)
-          {"cs-etm",
-           {"coresight etm events",
-            [](const EventType& e) {
-              return e.type == ETMRecorder::GetInstance().GetEtmEventType();
-            }}},
+    {"cs-etm",
+     {"coresight etm events",
+      [](const EventType& e) { return e.type == ETMRecorder::GetInstance().GetEtmEventType(); }}},
+    {"arm_spe",
+     {"Arm Statistical Profiling Extension events",
+      [](const EventType& e) { return e.type == SPERecorder::GetInstance().GetSPEEventType(); }}},
 #endif
-          {"pmu", {"pmu events", [](const EventType& e) { return e.IsPmuEvent(); }}},
-      };
+    {"pmu", {"pmu events", [](const EventType& e) { return (e.IsPmuEvent() && !e.IsSpeEvent()); }}},
+  };
 
   std::vector<std::string> names;
   if (args.empty()) {

@@ -98,7 +98,9 @@ class EventSelectionSet {
   std::vector<const EventType*> GetEvents() const;
   std::vector<const EventType*> GetTracepointEvents() const;
   bool ExcludeKernel() const;
-  bool HasAuxTrace() const { return has_aux_trace_; }
+  bool HasAuxTrace() const { return (has_aux_trace_etm_ || has_aux_trace_spe_); }
+  bool HasAuxTraceEtm() const { return has_aux_trace_etm_; }
+  bool HasAuxTraceSpe() const { return has_aux_trace_spe_; }
   EventAttrIds GetEventAttrWithId() const;
   std::unordered_map<uint64_t, std::string> GetEventNamesById() const;
   std::unordered_map<uint64_t, int> GetCpusById() const;
@@ -222,7 +224,8 @@ class EventSelectionSet {
 
   std::unique_ptr<simpleperf::RecordReadThread> record_read_thread_;
 
-  bool has_aux_trace_ = false;
+  bool has_aux_trace_etm_ = false;
+  bool has_aux_trace_spe_ = false;
   std::vector<AddrFilter> addr_filters_;
   std::optional<SampleRate> sample_rate_;
   std::optional<std::vector<int>> cpus_;
