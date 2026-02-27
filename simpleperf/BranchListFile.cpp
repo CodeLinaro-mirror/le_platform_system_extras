@@ -282,8 +282,9 @@ void ETMBranchListGeneratorImpl::ProcessBranchList(const ETMBranchList& branch_l
   if (!binary_filter_.Filter(branch_list.dso)) {
     return;
   }
-  auto& branch_map = branch_list_binary_map_[branch_list.dso].branch_map;
-  ++branch_map[branch_list.addr][branch_list.branch];
+  auto& binary = branch_list_binary_map_[branch_list.dso];
+  auto& branch_map = binary.branch_map;
+  ++branch_map[branch_list.addr][binary.GetBranch(branch_list.branch)];
 }
 
 ETMBinaryMap ETMBranchListGeneratorImpl::GetETMBinaryMap() {
@@ -389,7 +390,7 @@ bool BranchListProtoWriter::Write(const ETMBinaryMap& etm_data) {
     for (const auto& [addr, branch_map] : binary.branch_map) {
       add_proto_addr(addr);
       for (const auto& [branch, count] : branch_map) {
-        if (branch_count + branch.size() > max_branches_per_message_ && branch_count != 0) {
+        if (branch_count + branch->size() > max_branches_per_message_ && branch_count != 0) {
           if (!WriteProtoBranchList(*proto_branch_list)) {
             return false;
           }
@@ -400,11 +401,11 @@ bool BranchListProtoWriter::Write(const ETMBinaryMap& etm_data) {
           add_proto_addr(addr);
           branch_count = 0;
         }
-        branch_count += branch.size();
+        branch_count += branch->size();
 
         proto::ETMBinary_Address_Branch* proto_branch = proto_addr->add_branches();
-        proto_branch->set_branch(ETMBranchToProtoString(branch));
-        proto_branch->set_branch_size(branch.size());
+        proto_branch->set_branch(ETMBranchToProtoString(*branch));
+        proto_branch->set_branch_size(branch->size());
         proto_branch->set_count(count);
       }
     }
@@ -581,7 +582,7 @@ bool BranchListProtoReader::AddETMBinary(const proto::ETMBinary& proto_binary,
       const auto& proto_branch = proto_addr.branches(j);
       std::vector<bool> branch =
           ProtoStringToETMBranch(proto_branch.branch(), proto_branch.branch_size());
-      b_map[branch] = proto_branch.count();
+      b_map[binary.GetBranch(branch)] = proto_branch.count();
     }
   }
   return true;

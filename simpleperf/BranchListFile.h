@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <unordered_set>
+#include <vector>
+
 #include "ETMDecoder.h"
 #include "RegEx.h"
 #include "dso.h"
@@ -122,28 +125,34 @@ class BinaryFilter {
   std::unordered_map<const Dso*, bool> dso_filter_cache_;
 };
 
-using UnorderedETMBranchMap =
-    std::unordered_map<uint64_t, std::unordered_map<std::vector<bool>, uint64_t>>;
+using ETMBranch = std::vector<bool>;
+
+struct ETMBranchHash {
+  size_t operator()(const ETMBranch* b) const { return std::hash<ETMBranch>{}(*b); }
+};
+
+struct ETMBranchEqual {
+  bool operator()(const ETMBranch* a, const ETMBranch* b) const { return *a == *b; }
+};
+
+using UnorderedETMBranchMap = std::unordered_map<
+    uint64_t, std::unordered_map<const ETMBranch*, uint64_t, ETMBranchHash, ETMBranchEqual>>;
 
 struct ETMBinary {
   DsoType dso_type;
   UnorderedETMBranchMap branch_map;
+  std::unordered_set<ETMBranch> branch_pool;
+
+  const ETMBranch* GetBranch(const ETMBranch& branch) {
+    return &(*branch_pool.insert(branch).first);
+  }
 
   void Merge(const ETMBinary& other) {
-    for (auto& other_p : other.branch_map) {
-      auto it = branch_map.find(other_p.first);
-      if (it == branch_map.end()) {
-        branch_map[other_p.first] = std::move(other_p.second);
-      } else {
-        auto& map2 = it->second;
-        for (auto& other_p2 : other_p.second) {
-          auto it2 = map2.find(other_p2.first);
-          if (it2 == map2.end()) {
-            map2[other_p2.first] = other_p2.second;
-          } else {
-            OverflowSafeAdd(it2->second, other_p2.second);
-          }
-        }
+    for (const auto& [addr, other_b_map] : other.branch_map) {
+      auto& my_b_map = branch_map[addr];
+      for (const auto& [branch_ptr, count] : other_b_map) {
+        const ETMBranch* my_branch_ptr = GetBranch(*branch_ptr);
+        OverflowSafeAdd(my_b_map[my_branch_ptr], count);
       }
     }
   }
@@ -153,7 +162,11 @@ struct ETMBinary {
     for (const auto& p : branch_map) {
       uint64_t addr = p.first;
       const auto& b_map = p.second;
-      result[addr] = std::map<std::vector<bool>, uint64_t>(b_map.begin(), b_map.end());
+      std::map<std::vector<bool>, uint64_t> ordered_map;
+      for (const auto& [branch_ptr, count] : b_map) {
+        ordered_map[*branch_ptr] = count;
+      }
+      result[addr] = std::move(ordered_map);
     }
     return result;
   }
