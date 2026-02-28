@@ -1783,6 +1783,9 @@ std::vector<std::unique_ptr<Record>> ReadRecordsFromBuffer(const perf_event_attr
 }
 
 std::unique_ptr<Record> ReadRecordFromBuffer(const perf_event_attr& attr, char* p, char* end) {
+  if (static_cast<size_t>(end - p) < sizeof(perf_event_header)) {
+    return nullptr;
+  }
   auto header = reinterpret_cast<const perf_event_header*>(p);
   return ReadRecordFromBuffer(attr, header->type, p, end);
 }
