@@ -229,6 +229,7 @@ class DumpRecordCommand : public Command {
   std::unique_ptr<RecordFileReader> record_file_reader_;
   std::unique_ptr<ETMDecoder> etm_decoder_;
   std::unique_ptr<ETMThreadTree> etm_thread_tree_;
+  bool is_spe_trace_ = false;
   ThreadTree thread_tree_;
 
   std::vector<EventInfo> events_;
@@ -368,12 +369,18 @@ bool DumpRecordCommand::ProcessRecord(Record* r) {
       ProcessCallChainRecord(*static_cast<CallChainRecord*>(r));
       break;
     case PERF_RECORD_AUXTRACE_INFO: {
-      etm_thread_tree_.reset(new ETMThreadTreeForDumpCmd(thread_tree_));
-      etm_decoder_ = ETMDecoder::Create(*static_cast<AuxTraceInfoRecord*>(r), *etm_thread_tree_);
-      if (etm_decoder_) {
-        etm_decoder_->EnableDump(etm_dump_option_);
+      const auto& auxtrace_info = static_cast<AuxTraceInfoRecord&>(*r);
+      if (auxtrace_info.data->aux_type == AuxTraceInfoRecord::AUX_TYPE_SPE) {
+        // Just flag that this is an SPE trace, not ETM.
+        is_spe_trace_ = true;
       } else {
-        res = false;
+        etm_thread_tree_.reset(new ETMThreadTreeForDumpCmd(thread_tree_));
+        etm_decoder_ = ETMDecoder::Create(auxtrace_info, *etm_thread_tree_);
+        if (etm_decoder_) {
+          etm_decoder_->EnableDump(etm_dump_option_);
+        } else {
+          res = false;
+        }
       }
       break;
     }
@@ -459,6 +466,12 @@ SymbolInfo DumpRecordCommand::GetSymbolInfo(uint32_t pid, uint32_t tid, uint64_t
 }
 
 bool DumpRecordCommand::DumpAuxData(const AuxRecord& aux) {
+  if (is_spe_trace_) {
+    // AUX buffers are not dumped for SPE, it is done in report command.
+    // We still need to differentiate between SPE and ETM cases, otherwise code would branch
+    // into ETM codepath for SPE traces as well, and would crash there.
+    return true;
+  }
   if (aux.data->aux_size > SIZE_MAX) {
     LOG(ERROR) << "invalid aux size";
     return false;
