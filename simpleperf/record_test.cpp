@@ -231,3 +231,41 @@ TEST_F(RecordTest, DebugRecord) {
   ASSERT_STREQ(r.s, "hello");
   CheckRecordMatchBinary(r);
 }
+
+TEST_F(RecordTest, SampleRecord_BranchStackOverflow) {
+  event_attr.sample_type = PERF_SAMPLE_BRANCH_STACK;
+  std::vector<char> binary(Record::header_size() + sizeof(uint64_t) + 8, 0);
+  char* p = binary.data();
+  perf_event_header header;
+  header.type = PERF_RECORD_SAMPLE;
+  header.misc = 0;
+  header.size = binary.size();
+  memcpy(p, &header, sizeof(header));
+  p += sizeof(header);
+  // stack_nr = 0x8000000000000000
+  // stack_nr * sizeof(BranchStackItemType) = 0x8000000000000000 * 24 = 0 (overflow)
+  uint64_t stack_nr = 0x8000000000000000ULL;
+  memcpy(p, &stack_nr, sizeof(stack_nr));
+
+  SampleRecord r;
+  ASSERT_FALSE(r.Parse(event_attr, binary.data(), binary.data() + binary.size()));
+}
+
+TEST_F(RecordTest, SampleRecord_StackUserOverflow) {
+  event_attr.sample_type = PERF_SAMPLE_STACK_USER;
+  std::vector<char> binary(Record::header_size() + sizeof(uint64_t) + 8, 0);
+  char* p = binary.data();
+  perf_event_header header;
+  header.type = PERF_RECORD_SAMPLE;
+  header.misc = 0;
+  header.size = binary.size();
+  memcpy(p, &header, sizeof(header));
+  p += sizeof(header);
+  // size = UINT64_MAX
+  // size + 8 = 7 (overflow)
+  uint64_t size = UINT64_MAX;
+  memcpy(p, &size, sizeof(size));
+
+  SampleRecord r;
+  ASSERT_FALSE(r.Parse(event_attr, binary.data(), binary.data() + binary.size()));
+}

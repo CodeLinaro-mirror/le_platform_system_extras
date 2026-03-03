@@ -338,7 +338,6 @@ std::unique_ptr<Record> RecordFileReader::ReadRecord(ReadPos& pos) {
   if (!header.Parse(p.get())) {
     return nullptr;
   }
-
   if (header.type == SIMPLE_PERF_RECORD_SPLIT) {
     // Read until meeting a RECORD_SPLIT_END record.
     std::vector<char> buf;
@@ -410,6 +409,10 @@ std::unique_ptr<char[]> RecordFileReader::ReadRecordWithDecompression(ReadPos& p
       if (output.size() >= sizeof(perf_event_header)) {
         auto header = reinterpret_cast<const perf_event_header*>(output.data());
         if (header->size <= output.size()) {
+          if (header->size < sizeof(perf_event_header)) {
+            LOG(ERROR) << "invalid record size " << header->size;
+            return nullptr;
+          }
           auto p = std::make_unique<char[]>(header->size);
           memcpy(p.get(), output.data(), header->size);
           decompressor_->ConsumeOutputData(header->size);
