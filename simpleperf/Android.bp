@@ -751,7 +751,6 @@ cc_defaults {
         componentid: 1284821,
         cc: ["android-llvm-dev@google.com"],
     },
-    native_coverage: false,
 }
 
 cc_fuzz {

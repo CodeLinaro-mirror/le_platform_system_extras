@@ -550,9 +550,13 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
   if (sample_type & PERF_SAMPLE_BRANCH_STACK) {
     CHECK_SIZE_U64(p, end, 1);
     MoveFromBinaryFormat(branch_stack_data.stack_nr, p);
-    CHECK_SIZE(p, end, branch_stack_data.stack_nr * sizeof(BranchStackItemType));
+    uint64_t size;
+    if (__builtin_mul_overflow(branch_stack_data.stack_nr, sizeof(BranchStackItemType), &size)) {
+      return false;
+    }
+    CHECK_SIZE(p, end, size);
     branch_stack_data.stack = reinterpret_cast<BranchStackItemType*>(p);
-    p += branch_stack_data.stack_nr * sizeof(BranchStackItemType);
+    p += size;
   }
   if (sample_type & PERF_SAMPLE_REGS_USER) {
     CHECK_SIZE_U64(p, end, 1);
@@ -576,7 +580,11 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
     if (stack_user_data.size == 0) {
       stack_user_data.dyn_size = 0;
     } else {
-      CHECK_SIZE(p, end, stack_user_data.size + sizeof(uint64_t));
+      uint64_t size;
+      if (__builtin_add_overflow(stack_user_data.size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
       stack_user_data.data = p;
       p += stack_user_data.size;
       MoveFromBinaryFormat(stack_user_data.dyn_size, p);
@@ -1131,11 +1139,23 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
     if (magic == MAGIC_ETM4) {
       CHECK_SIZE(p, end, sizeof(ETM4Info));
       ETM4Info& e = *reinterpret_cast<ETM4Info*>(p);
-      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
+      uint64_t size;
+      if (__builtin_add_overflow(e.nrtrcparams, 3, &size) ||
+          __builtin_mul_overflow(size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
+      p += size;
     } else if (magic == MAGIC_ETE) {
       CHECK_SIZE(p, end, sizeof(ETEInfo));
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(p);
-      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
+      uint64_t size;
+      if (__builtin_add_overflow(e.nrtrcparams, 3, &size) ||
+          __builtin_mul_overflow(size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
+      p += size;
     } else if (magic == MAGIC_SPE) {
       CHECK_SIZE(p, end, sizeof(SPEInfo));
       p += sizeof(SPEInfo);
@@ -1422,8 +1442,12 @@ bool EventIdRecord::Parse(const perf_event_attr&, char* p, char* end) {
   CHECK_SIZE_U64(p, end, 1);
   MoveFromBinaryFormat(count, p);
   data = reinterpret_cast<const EventIdData*>(p);
-  CHECK_SIZE(p, end, sizeof(data[0]) * count);
-  p += sizeof(data[0]) * count;
+  uint64_t size;
+  if (__builtin_mul_overflow(sizeof(data[0]), count, &size)) {
+    return false;
+  }
+  CHECK_SIZE(p, end, size);
+  p += size;
   return p == end;
 }
 
@@ -1458,7 +1482,11 @@ bool CallChainRecord::Parse(const perf_event_attr&, char* p, char* end) {
   MoveFromBinaryFormat(chain_type, p);
   MoveFromBinaryFormat(time, p);
   MoveFromBinaryFormat(ip_nr, p);
-  CHECK_SIZE_U64(p, end, ip_nr * 2);
+  uint64_t u64_count;
+  if (__builtin_mul_overflow(ip_nr, 2, &u64_count)) {
+    return false;
+  }
+  CHECK_SIZE_U64(p, end, u64_count);
   ips = reinterpret_cast<uint64_t*>(p);
   p += ip_nr * sizeof(uint64_t);
   sps = reinterpret_cast<uint64_t*>(p);
@@ -1545,7 +1573,11 @@ bool UnwindingResultRecord::Parse(const perf_event_attr&, char* p, char* end) {
   if (stack_user_data.size == 0) {
     stack_user_data.dyn_size = 0;
   } else {
-    CHECK_SIZE(p, end, stack_user_data.size + sizeof(uint64_t));
+    uint64_t size;
+    if (__builtin_add_overflow(stack_user_data.size, sizeof(uint64_t), &size)) {
+      return false;
+    }
+    CHECK_SIZE(p, end, size);
     stack_user_data.data = p;
     p += stack_user_data.size;
     MoveFromBinaryFormat(stack_user_data.dyn_size, p);
@@ -1555,7 +1587,11 @@ bool UnwindingResultRecord::Parse(const perf_event_attr&, char* p, char* end) {
   if (p < end) {
     CHECK_SIZE_U64(p, end, 1);
     MoveFromBinaryFormat(callchain.length, p);
-    CHECK_SIZE_U64(p, end, callchain.length * 2);
+    uint64_t u64_count;
+    if (__builtin_mul_overflow(callchain.length, 2, &u64_count)) {
+      return false;
+    }
+    CHECK_SIZE_U64(p, end, u64_count);
     callchain.ips = reinterpret_cast<uint64_t*>(p);
     p += callchain.length * sizeof(uint64_t);
     callchain.sps = reinterpret_cast<uint64_t*>(p);
@@ -1783,6 +1819,9 @@ std::vector<std::unique_ptr<Record>> ReadRecordsFromBuffer(const perf_event_attr
 }
 
 std::unique_ptr<Record> ReadRecordFromBuffer(const perf_event_attr& attr, char* p, char* end) {
+  if (static_cast<size_t>(end - p) < sizeof(perf_event_header)) {
+    return nullptr;
+  }
   auto header = reinterpret_cast<const perf_event_header*>(p);
   return ReadRecordFromBuffer(attr, header->type, p, end);
 }

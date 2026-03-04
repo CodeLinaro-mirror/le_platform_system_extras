@@ -60,7 +60,7 @@ void OneTimeFreeAllocator::Clear() {
 
 const char* OneTimeFreeAllocator::AllocateString(std::string_view s) {
   size_t size = s.size() + 1;
-  if (cur_ + size > end_) {
+  if (size > static_cast<size_t>(end_ - cur_)) {
     size_t alloc_size = std::max(size, unit_size_);
     char* p = new char[alloc_size];
     v_.push_back(p);
