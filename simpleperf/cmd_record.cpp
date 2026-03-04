@@ -1722,7 +1722,7 @@ bool RecordCommand::ShouldOmitRecord(Record* record) {
     // Kernel maps are small enough to be always kept. User space maps should all use Mmap2Records.
     if (record->type() == PERF_RECORD_MMAP2) {
       const auto& r = static_cast<const Mmap2Record&>(*record);
-      if (!binary_name_regex_->Search(r.filename)) {
+      if (!binary_name_regex_->ThreadUnsafeSearch(r.filename)) {
         return true;
       }
     }
