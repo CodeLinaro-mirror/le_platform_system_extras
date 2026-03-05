@@ -494,7 +494,7 @@ std::optional<std::set<pid_t>> GetPidsFromStrings(const std::vector<std::string>
         continue;
       }
       for (const auto& reg : regs) {
-        if (reg->Search(process_name)) {
+        if (reg->ThreadUnsafeSearch(process_name)) {
           pids.insert(pid);
           break;
         }
