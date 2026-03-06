@@ -97,12 +97,28 @@ class RegExImpl : public RegEx {
   }
 
   bool Match(std::string_view s) const override {
+    pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(re_, nullptr);
+    int rc = pcre2_match(re_, reinterpret_cast<PCRE2_SPTR>(s.data()), s.size(), 0,
+                         PCRE2_ANCHORED | PCRE2_ENDANCHORED, match_data, nullptr);
+    pcre2_match_data_free(match_data);
+    return rc >= 0;
+  }
+
+  bool Search(std::string_view s) const override {
+    pcre2_match_data* match_data = pcre2_match_data_create_from_pattern(re_, nullptr);
+    int rc = pcre2_match(re_, reinterpret_cast<PCRE2_SPTR>(s.data()), s.size(), 0, 0, match_data,
+                         nullptr);
+    pcre2_match_data_free(match_data);
+    return rc >= 0;
+  }
+
+  bool ThreadUnsafeMatch(std::string_view s) const override {
     int rc = pcre2_match(re_, reinterpret_cast<PCRE2_SPTR>(s.data()), s.size(), 0,
                          PCRE2_ANCHORED | PCRE2_ENDANCHORED, match_data_, nullptr);
     return rc >= 0;
   }
 
-  bool Search(std::string_view s) const override {
+  bool ThreadUnsafeSearch(std::string_view s) const override {
     int rc = pcre2_match(re_, reinterpret_cast<PCRE2_SPTR>(s.data()), s.size(), 0, 0, match_data_,
                          nullptr);
     return rc >= 0;
