@@ -40,7 +40,7 @@ NDK_ERROR_MESSAGE = "Please install the Android NDK (https://developer.android.c
 
 
 def get_script_dir() -> str:
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.realpath(__file__))
 
 
 def is_windows() -> bool:
