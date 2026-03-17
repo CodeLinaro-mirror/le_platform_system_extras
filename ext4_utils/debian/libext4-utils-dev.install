@@ -1,0 +1,3 @@
+usr/include/ext4_utils/*.h
+usr/lib/${DEB_HOST_MULTIARCH}/libext4_utils.so
+usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/ext4_utils.pc
