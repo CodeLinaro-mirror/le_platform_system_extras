@@ -21,10 +21,15 @@ if BUILD_DEVICE
 lib_LTLIBRARIES = libext4_utils.la
 
 libext4_utils_la_SOURCES   = $(libext4_utils_c_sources) $(libext4_utils_cpp_sources)
-libext4_utils_la_CPPFLAGS  = $(LIBSELINUX_CFLAGS) $(LIBSPARSE_CFLAGS)
-libext4_utils_la_CPPFLAGS += -std=c++11
+libext4_utils_la_CPPFLAGS  = $(LIBSPARSE_CFLAGS)
 libext4_utils_la_LDFLAGS   = $(LIBSPARSE_LIBS)
-libext4_utils_la_LDFLAGS  += -lcutils -lsparse -lselinux
+libext4_utils_la_LDFLAGS  += -lcutils -lsparse
+if ENABLE_SELINUX_POLICY
+libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
+libext4_utils_la_CPPFLAGS += -DSELINUX_POLICY=1
+libext4_utils_la_LDFLAGS  += -lselinux
+endif
+libext4_utils_la_CPPFLAGS += -std=c++11
 endif
 
 if BUILD_HOST
@@ -32,9 +37,14 @@ if BUILD_HOST
 lib_LTLIBRARIES = libext4_utils.la
 
 libext4_utils_la_SOURCES   = $(libext4_utils_c_sources)
-libext4_utils_la_CPPFLAGS  = $(LIBSELINUX_CFLAGS) $(LIBSPARSE_CFLAGS)
+libext4_utils_la_CPPFLAGS  = $(LIBSPARSE_CFLAGS)
 libext4_utils_la_LDFLAGS   = $(LIBSPARSE_LIBS)
-libext4_utils_la_LDFLAGS  += -lcutils -lsparse -lselinux
+libext4_utils_la_LDFLAGS  += -lcutils -lsparse
+if ENABLE_SELINUX_POLICY
+libext4_utils_la_CPPFLAGS += $(LIBSELINUX_CFLAGS)
+libext4_utils_la_CPPFLAGS += -DSELINUX_POLICY=1
+libext4_utils_la_LDFLAGS  += -lselinux
+endif
 
 ### Build make_ext4fs ext2simg binary
 bin_PROGRAMS = make_ext4fs ext2simg
@@ -43,6 +53,9 @@ make_ext4fs_SOURCES  = make_ext4fs_main.c canned_fs_config.c
 make_ext4fs_CFLAGS   = $(AM_CFLAGS)
 make_ext4fs_CFLAGS  += -DANDROID
 make_ext4fs_CFLAGS  += -DHOST
+if ENABLE_SELINUX_POLICY
+make_ext4fs_CFLAGS  += -DSELINUX_POLICY=1
+endif
 make_ext4fs_LDADD    = libext4_utils.la
 make_ext4fs_LDADD   += -lcutils -lsparse
 
