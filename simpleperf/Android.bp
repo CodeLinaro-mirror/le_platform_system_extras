@@ -250,6 +250,7 @@ cc_defaults {
         "record_file_reader.cpp",
         "record_file_writer.cpp",
         "report_utils.cpp",
+        "SPEDecoder.cpp",
         "thread_tree.cpp",
         "tracing.cpp",
         "utils.cpp",
@@ -284,6 +285,7 @@ cc_defaults {
                 "ProbeEvents.cpp",
                 "read_dex_file.cpp",
                 "RecordReadThread.cpp",
+                "SPERecorder.cpp",
                 "workload.cpp",
             ],
         },
@@ -507,6 +509,7 @@ cc_library_shared {
     },
     srcs: [
         "report_lib_interface.cpp",
+        "report_utils_interface.cpp",
     ],
     static_libs: ["libsimpleperf"],
 
@@ -748,7 +751,6 @@ cc_defaults {
         componentid: 1284821,
         cc: ["android-llvm-dev@google.com"],
     },
-    native_coverage: false,
 }
 
 cc_fuzz {

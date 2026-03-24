@@ -65,6 +65,7 @@ static std::string RecordTypeToString(int record_type) {
       {PERF_RECORD_TRACING_DATA, "tracing_data"},
       {PERF_RECORD_AUXTRACE_INFO, "auxtrace_info"},
       {PERF_RECORD_AUXTRACE, "auxtrace"},
+      {PERF_RECORD_ITRACE_START, "itrace_start"},
       {SIMPLE_PERF_RECORD_KERNEL_SYMBOL, "kernel_symbol"},
       {SIMPLE_PERF_RECORD_DSO, "dso"},
       {SIMPLE_PERF_RECORD_SYMBOL, "symbol"},
@@ -549,9 +550,13 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
   if (sample_type & PERF_SAMPLE_BRANCH_STACK) {
     CHECK_SIZE_U64(p, end, 1);
     MoveFromBinaryFormat(branch_stack_data.stack_nr, p);
-    CHECK_SIZE(p, end, branch_stack_data.stack_nr * sizeof(BranchStackItemType));
+    uint64_t size;
+    if (__builtin_mul_overflow(branch_stack_data.stack_nr, sizeof(BranchStackItemType), &size)) {
+      return false;
+    }
+    CHECK_SIZE(p, end, size);
     branch_stack_data.stack = reinterpret_cast<BranchStackItemType*>(p);
-    p += branch_stack_data.stack_nr * sizeof(BranchStackItemType);
+    p += size;
   }
   if (sample_type & PERF_SAMPLE_REGS_USER) {
     CHECK_SIZE_U64(p, end, 1);
@@ -575,7 +580,11 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
     if (stack_user_data.size == 0) {
       stack_user_data.dyn_size = 0;
     } else {
-      CHECK_SIZE(p, end, stack_user_data.size + sizeof(uint64_t));
+      uint64_t size;
+      if (__builtin_add_overflow(stack_user_data.size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
       stack_user_data.data = p;
       p += stack_user_data.size;
       MoveFromBinaryFormat(stack_user_data.dyn_size, p);
@@ -590,16 +599,22 @@ bool SampleRecord::Parse(const perf_event_attr& attr, char* p, char* end) {
 
 SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip, uint32_t pid,
                            uint32_t tid, uint64_t time, uint32_t cpu, uint64_t period,
-                           const PerfSampleReadType& read_data, const std::vector<uint64_t>& ips,
-                           const std::vector<char>& stack, uint64_t dyn_stack_size) {
-  SetTypeAndMisc(PERF_RECORD_SAMPLE, PERF_RECORD_MISC_USER);
+                           uint64_t addr, const PerfSampleReadType& read_data,
+                           const std::vector<uint64_t>& ips, const std::vector<char>& stack,
+                           uint64_t dyn_stack_size, bool in_kernel,
+                           uint64_t additional_sample_type) {
+  SetTypeAndMisc(PERF_RECORD_SAMPLE, in_kernel ? PERF_RECORD_MISC_KERNEL : PERF_RECORD_MISC_USER);
   sample_type = attr.sample_type;
+  if (sample_type != 0) {
+    sample_type |= additional_sample_type;
+  }
   read_format = attr.read_format;
-  CHECK_EQ(0u,
-           sample_type & ~(PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
-                           PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_READ |
-                           PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_STACK_USER));
+  CHECK_EQ(0u, sample_type &
+                   ~(PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
+                     PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_READ | PERF_SAMPLE_ADDR |
+                     PERF_SAMPLE_CALLCHAIN | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_STACK_USER));
   ip_data.ip = ip;
+  addr_data.addr = addr;
   tid_data.pid = pid;
   tid_data.tid = tid;
   time_data.time = time;
@@ -620,6 +635,9 @@ SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip
   uint32_t size = header_size();
   if (sample_type & PERF_SAMPLE_IP) {
     size += sizeof(ip_data);
+  }
+  if (sample_type & PERF_SAMPLE_ADDR) {
+    size += sizeof(addr_data);
   }
   if (sample_type & PERF_SAMPLE_TID) {
     size += sizeof(tid_data);
@@ -659,6 +677,9 @@ SampleRecord::SampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip
   MoveToBinaryFormat(header, p);
   if (sample_type & PERF_SAMPLE_IP) {
     MoveToBinaryFormat(ip_data, p);
+  }
+  if (sample_type & PERF_SAMPLE_ADDR) {
+    MoveToBinaryFormat(addr_data, p);
   }
   if (sample_type & PERF_SAMPLE_TID) {
     MoveToBinaryFormat(tid_data, p);
@@ -1108,7 +1129,8 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
   data = reinterpret_cast<DataType*>(p);
   CHECK_SIZE(p, end, sizeof(*data));
   p += sizeof(*data);
-  if (data->aux_type != AUX_TYPE_ETM || data->version > 2) {
+  if (!((data->aux_type == AUX_TYPE_ETM && data->version <= 2) ||
+        (data->aux_type == AUX_TYPE_SPE && data->version == 1))) {
     return false;
   }
   for (uint32_t i = 0; i < data->nr_cpu; ++i) {
@@ -1117,11 +1139,26 @@ bool AuxTraceInfoRecord::Parse(const perf_event_attr&, char* p, char* end) {
     if (magic == MAGIC_ETM4) {
       CHECK_SIZE(p, end, sizeof(ETM4Info));
       ETM4Info& e = *reinterpret_cast<ETM4Info*>(p);
-      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
+      uint64_t size;
+      if (__builtin_add_overflow(e.nrtrcparams, 3, &size) ||
+          __builtin_mul_overflow(size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
+      p += size;
     } else if (magic == MAGIC_ETE) {
       CHECK_SIZE(p, end, sizeof(ETEInfo));
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(p);
-      p += (e.nrtrcparams + 3) * sizeof(uint64_t);
+      uint64_t size;
+      if (__builtin_add_overflow(e.nrtrcparams, 3, &size) ||
+          __builtin_mul_overflow(size, sizeof(uint64_t), &size)) {
+        return false;
+      }
+      CHECK_SIZE(p, end, size);
+      p += size;
+    } else if (magic == MAGIC_SPE) {
+      CHECK_SIZE(p, end, sizeof(SPEInfo));
+      p += sizeof(SPEInfo);
     } else {
       return false;
     }
@@ -1155,6 +1192,21 @@ AuxTraceInfoRecord::AuxTraceInfoRecord(const DataType& data, const std::vector<E
   UpdateBinary(new_binary);
 }
 
+AuxTraceInfoRecord::AuxTraceInfoRecord(const DataType& data, const std::vector<SPEInfo>& spe_info) {
+  SetTypeAndMisc(PERF_RECORD_AUXTRACE_INFO, 0);
+
+  uint32_t size = header_size() + sizeof(DataType);
+  size += sizeof(SPEInfo) * spe_info.size();
+  SetSize(size);
+  char* new_binary = new char[size];
+  char* p = new_binary;
+  MoveToBinaryFormat(header, p);
+  this->data = reinterpret_cast<DataType*>(p);
+  MoveToBinaryFormat(data, p);
+  MoveToBinaryFormat(spe_info.data(), spe_info.size(), p);
+  UpdateBinary(new_binary);
+}
+
 void AuxTraceInfoRecord::DumpData(size_t indent) const {
   PrintIndented(indent, "aux_type %u\n", data->aux_type);
   PrintIndented(indent, "version %" PRIu64 "\n", data->version);
@@ -1178,8 +1230,7 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcidr8 0x%" PRIx64 "\n", e.trcidr8);
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
       info += e.nrtrcparams + 3;
-    } else {
-      CHECK_EQ(info[0], MAGIC_ETE);
+    } else if (info[0] == MAGIC_ETE) {
       ETEInfo& e = *reinterpret_cast<ETEInfo*>(info);
       PrintIndented(indent, "magic 0x%" PRIx64 "\n", e.magic);
       PrintIndented(indent, "cpu %" PRIu64 "\n", e.cpu);
@@ -1193,6 +1244,15 @@ void AuxTraceInfoRecord::DumpData(size_t indent) const {
       PrintIndented(indent, "trcauthstatus 0x%" PRIx64 "\n", e.trcauthstatus);
       PrintIndented(indent, "trcdevarch 0x%" PRIx64 "\n", e.trcdevarch);
       info += e.nrtrcparams + 3;
+    } else {
+      CHECK_EQ(info[0], MAGIC_SPE);
+      SPEInfo& e = *reinterpret_cast<SPEInfo*>(info);
+      PrintIndented(indent, "magic 0x%" PRIx64 "\n", e.magic);
+      PrintIndented(indent, "cpu %" PRIu64 "\n", e.cpu);
+      PrintIndented(indent, "cap_min_ival 0x%" PRIx64 "\n", e.cap_min_ival);
+      PrintIndented(indent, "cpu_midr 0x%" PRIx64 "\n", e.cpu_midr);
+      PrintIndented(indent, "enabled 0x%" PRIx64 "\n", e.enabled);
+      info = reinterpret_cast<uint64_t*>(&e + 1);
     }
   }
 }
@@ -1382,8 +1442,12 @@ bool EventIdRecord::Parse(const perf_event_attr&, char* p, char* end) {
   CHECK_SIZE_U64(p, end, 1);
   MoveFromBinaryFormat(count, p);
   data = reinterpret_cast<const EventIdData*>(p);
-  CHECK_SIZE(p, end, sizeof(data[0]) * count);
-  p += sizeof(data[0]) * count;
+  uint64_t size;
+  if (__builtin_mul_overflow(sizeof(data[0]), count, &size)) {
+    return false;
+  }
+  CHECK_SIZE(p, end, size);
+  p += size;
   return p == end;
 }
 
@@ -1418,7 +1482,11 @@ bool CallChainRecord::Parse(const perf_event_attr&, char* p, char* end) {
   MoveFromBinaryFormat(chain_type, p);
   MoveFromBinaryFormat(time, p);
   MoveFromBinaryFormat(ip_nr, p);
-  CHECK_SIZE_U64(p, end, ip_nr * 2);
+  uint64_t u64_count;
+  if (__builtin_mul_overflow(ip_nr, 2, &u64_count)) {
+    return false;
+  }
+  CHECK_SIZE_U64(p, end, u64_count);
   ips = reinterpret_cast<uint64_t*>(p);
   p += ip_nr * sizeof(uint64_t);
   sps = reinterpret_cast<uint64_t*>(p);
@@ -1505,7 +1573,11 @@ bool UnwindingResultRecord::Parse(const perf_event_attr&, char* p, char* end) {
   if (stack_user_data.size == 0) {
     stack_user_data.dyn_size = 0;
   } else {
-    CHECK_SIZE(p, end, stack_user_data.size + sizeof(uint64_t));
+    uint64_t size;
+    if (__builtin_add_overflow(stack_user_data.size, sizeof(uint64_t), &size)) {
+      return false;
+    }
+    CHECK_SIZE(p, end, size);
     stack_user_data.data = p;
     p += stack_user_data.size;
     MoveFromBinaryFormat(stack_user_data.dyn_size, p);
@@ -1515,7 +1587,11 @@ bool UnwindingResultRecord::Parse(const perf_event_attr&, char* p, char* end) {
   if (p < end) {
     CHECK_SIZE_U64(p, end, 1);
     MoveFromBinaryFormat(callchain.length, p);
-    CHECK_SIZE_U64(p, end, callchain.length * 2);
+    uint64_t u64_count;
+    if (__builtin_mul_overflow(callchain.length, 2, &u64_count)) {
+      return false;
+    }
+    CHECK_SIZE_U64(p, end, u64_count);
     callchain.ips = reinterpret_cast<uint64_t*>(p);
     p += callchain.length * sizeof(uint64_t);
     callchain.sps = reinterpret_cast<uint64_t*>(p);
@@ -1743,6 +1819,9 @@ std::vector<std::unique_ptr<Record>> ReadRecordsFromBuffer(const perf_event_attr
 }
 
 std::unique_ptr<Record> ReadRecordFromBuffer(const perf_event_attr& attr, char* p, char* end) {
+  if (static_cast<size_t>(end - p) < sizeof(perf_event_header)) {
+    return nullptr;
+  }
   auto header = reinterpret_cast<const perf_event_header*>(p);
   return ReadRecordFromBuffer(attr, header->type, p, end);
 }

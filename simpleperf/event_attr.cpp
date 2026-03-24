@@ -83,6 +83,8 @@ perf_event_attr CreateDefaultPerfEventAttr(const EventType& event_type) {
   attr.size = sizeof(perf_event_attr);
   attr.type = event_type.type;
   attr.config = event_type.config;
+  attr.config1 = event_type.config1;
+  attr.config2 = event_type.config2;
   attr.disabled = 0;
   // Changing read_format affects the layout of the data read from perf_event_file, namely
   // PerfCounter in event_fd.h.
@@ -135,6 +137,7 @@ void DumpPerfEventAttr(const perf_event_attr& attr, size_t indent) {
 
   PrintIndented(indent + 1, "sample_id_all %u, exclude_host %u, exclude_guest %u\n",
                 attr.sample_id_all, attr.exclude_host, attr.exclude_guest);
+  PrintIndented(indent + 1, "config1 0x%llx\n", attr.config1);
   PrintIndented(indent + 1, "config2 0x%llx\n", attr.config2);
   PrintIndented(indent + 1, "branch_sample_type 0x%" PRIx64 "\n", attr.branch_sample_type);
   PrintIndented(indent + 1, "exclude_callchain_kernel %u, exclude_callchain_user %u\n",
@@ -243,10 +246,10 @@ bool IsCpuSupported(const perf_event_attr& attr) {
 std::string GetEventNameByAttr(const perf_event_attr& attr) {
   std::string name = "unknown";
   auto callback = [&](const EventType& event_type) {
-    // An event type uses both type and config value to define itself. But etm event type
-    // only uses type value (whose config value is used to set etm options).
+    // An event type uses both type and config value to define itself. But etm/spe event types
+    // only use type value (whose config value is used to set etm/spe options).
     if (event_type.type == attr.type &&
-        (event_type.config == attr.config || event_type.IsEtmEvent())) {
+        (event_type.config == attr.config || event_type.IsEtmEvent() || event_type.IsSpeEvent())) {
       name = event_type.name;
       if (attr.exclude_user && !attr.exclude_kernel) {
         name += ":k";

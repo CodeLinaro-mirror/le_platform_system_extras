@@ -59,6 +59,7 @@
 #include "OfflineUnwinder.h"
 #include "ProbeEvents.h"
 #include "RecordFilter.h"
+#include "SPERecorder.h"
 #include "cmd_record_impl.h"
 #include "command.h"
 #include "environment.h"
@@ -692,7 +693,7 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
   } else {
     need_to_check_targets = true;
   }
-  if (delay_in_ms_ != 0 || event_selection_set_.HasAuxTrace()) {
+  if (delay_in_ms_ != 0 || event_selection_set_.HasAuxTraceEtm()) {
     event_selection_set_.SetEnableCondition(false, false);
   }
 
@@ -815,7 +816,7 @@ bool RecordCommand::PrepareRecording(Workload* workload) {
       }
     }
   }
-  if (event_selection_set_.HasAuxTrace()) {
+  if (event_selection_set_.HasAuxTraceEtm()) {
     // ETM events can only be enabled successfully after MmapEventFiles().
     if (delay_in_ms_ == 0 && !event_selection_set_.IsEnabledOnExec()) {
       if (!event_selection_set_.EnableETMEvents()) {
@@ -1022,6 +1023,7 @@ bool RecordCommand::ParseOptions(const std::vector<std::string>& args,
                                  ProbeEvents& probe_events) {
   OptionValueMap options;
   std::vector<std::pair<OptionName, OptionValue>> ordered_options;
+  bool spe_event_present = false;
 
   if (!PreprocessOptions(args, GetRecordCmdOptionFormats(), &options, &ordered_options,
                          non_option_args)) {
@@ -1360,6 +1362,17 @@ bool RecordCommand::ParseOptions(const std::vector<std::string>& args,
         if (!probe_events.CreateProbeEventIfNotExist(event_type)) {
           return false;
         }
+#if defined(__aarch64__)
+        if (IsSpeEventName(event_type)) {
+          if (spe_event_present) {
+            LOG(ERROR) << "Only one SPE device can be used for record command!";
+            return false;
+          }
+          spe_event_present = true;
+          SPERecorder& recorder = SPERecorder::GetInstance();
+          event_type = recorder.ParseSpeTypes(event_type);
+        }
+#endif
         if (!event_selection_set_.AddEventType(event_type, check_event_type)) {
           return false;
         }
@@ -1667,8 +1680,11 @@ bool RecordCommand::ProcessRecord(Record* record) {
 }
 
 bool RecordCommand::DumpAuxTraceInfo() {
-  if (event_selection_set_.HasAuxTrace()) {
+  if (event_selection_set_.HasAuxTraceEtm()) {
     AuxTraceInfoRecord auxtrace_info = ETMRecorder::GetInstance().CreateAuxTraceInfoRecord();
+    return ProcessRecord(&auxtrace_info);
+  } else if (event_selection_set_.HasAuxTraceSpe()) {
+    AuxTraceInfoRecord auxtrace_info = SPERecorder::GetInstance().CreateAuxTraceInfoRecord();
     return ProcessRecord(&auxtrace_info);
   }
   return true;
@@ -1706,7 +1722,7 @@ bool RecordCommand::ShouldOmitRecord(Record* record) {
     // Kernel maps are small enough to be always kept. User space maps should all use Mmap2Records.
     if (record->type() == PERF_RECORD_MMAP2) {
       const auto& r = static_cast<const Mmap2Record&>(*record);
-      if (!binary_name_regex_->Search(r.filename)) {
+      if (!binary_name_regex_->ThreadUnsafeSearch(r.filename)) {
         return true;
       }
     }
@@ -2109,7 +2125,7 @@ bool RecordCommand::DumpAdditionalFeatures(const std::vector<std::string>& args)
     }
   };
 
-  // We don't need to read data section when recording ETM data and not need to dump build ids.
+  // We don't need to read data section when recording ETM/SPE data and not need to dump build ids.
   bool read_data_section = true;
   if (event_selection_set_.HasAuxTrace() && !dump_build_id_) {
     read_data_section = false;
@@ -2230,7 +2246,7 @@ bool RecordCommand::DumpBuildIdFeature() {
 
 bool RecordCommand::DumpFileFeature() {
   std::vector<Dso*> dso_v = thread_tree_.GetAllDsos();
-  // To parse ETM data for kernel modules, we need to dump memory address for kernel modules.
+  // To parse ETM/SPE data for kernel modules, we need to dump memory address for kernel modules.
   if (event_selection_set_.HasAuxTrace() && !event_selection_set_.ExcludeKernel()) {
     for (Dso* dso : dso_v) {
       if (dso->type() == DSO_KERNEL_MODULE) {

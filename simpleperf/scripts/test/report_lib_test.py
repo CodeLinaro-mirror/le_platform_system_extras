@@ -381,6 +381,7 @@ class TestReportLib(TestBase):
         """ Test using ReportLib.DisableDemangle(). """
         record_file = TestHelper.testdata_path('perf_display_bitmaps.data')
         self.report_lib.SetRecordFile(record_file)
+
         def get_symbol_names() -> Set[str]:
             symbol_names = set()
             while self.report_lib.GetNextSample():
@@ -535,3 +536,24 @@ class TestProtoFileReportLib(TestBase):
             TestHelper.testdata_path('perf.data'))
         report_lib.SetRecordFile(proto_file_path)
         self.assertEqual(report_lib.GetSupportedTraceOffCpuModes(), [])
+
+    def test_add_proguard_mapping_file(self):
+        report_lib = ProtoFileReportLib()
+        with self.assertRaises(ValueError):
+            report_lib.AddProguardMappingFile('non_exist_file')
+        proguard_mapping_file = TestHelper.testdata_path('proguard_mapping.txt')
+        report_lib.AddProguardMappingFile(proguard_mapping_file)
+        report_lib.Close()
+
+    def test_de_obfuscate(self):
+        report_lib = ProtoFileReportLib()
+        proto_file_path = self.convert_perf_data_to_proto_file(
+            TestHelper.testdata_path('perf_need_proguard_mapping.data'))
+        report_lib.SetRecordFile(proto_file_path)
+        report_lib.AddProguardMappingFile(TestHelper.testdata_path('proguard_mapping.txt'))
+        symbol_names = set()
+        while report_lib.GetNextSample():
+            symbol = report_lib.GetSymbolOfCurrentSample()
+            symbol_names.add(symbol.symbol_name)
+        self.assertIn('androidx.fragment.app.FragmentActivity.startActivityForResult', symbol_names)
+        report_lib.Close()
