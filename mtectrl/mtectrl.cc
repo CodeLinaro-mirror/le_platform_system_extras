@@ -73,7 +73,6 @@ void PrintUsage(const char* progname) {
          "      [-f PROPERTY_NAME]\n"
          "      [none,][memtag,][memtag-once,][memtag-kernel,][memtag-kernel-once,][memtag-off,]\n"
          "      [default|force_on|force_off]\n"
-         "      [true|false]\n"
          "      [-t PATH_TO_FAKE_MISC_PARTITION]\n"
 
          "OPTIONS:\n"
@@ -110,11 +109,7 @@ void PrintUsage(const char* progname) {
          "        - force_on: MTE is persistently enabled in userspace, overwriting the userspace\n"
          "                    setting.\n"
          "        - force_off: MTE is persistently disabled in userspace and the kernel, \n"
-         "                     overwriting the userspace setting.\n"
-         "  [true|false]\n"
-         "      If true, and the previous argument is \"default\", the MTE mode is set to \n"
-         "      force_on. This is used by the vendor mte_launcher to override the default \n"
-         "      setting.\n";
+         "                     overwriting the userspace setting.\n";
 }
 
 int StringToMode(const char* value) {
@@ -312,7 +307,6 @@ int main(int argc, char** argv) {
 
   const char* value = optind < argc ? argv[optind++] : nullptr;
   const char* override_value = optind < argc ? argv[optind++] : nullptr;
-  const char* launcher_value = optind < argc ? argv[optind++] : nullptr;
 
   if ((optind != argc) ||       // Unknown argument.
       (value && flag_prop) ||   // -f is only valid when no value given
@@ -337,12 +331,8 @@ int main(int argc, char** argv) {
   bool valid_value = memtag_mode != -1;
   m.memtag_mode = valid_value ? memtag_mode : 0;
 
-  std::string effective_override = override_value ? override_value : "default";
-  if (effective_override == "default" && launcher_value && std::string(launcher_value) == "true") {
-    effective_override = "force_on";
-  }
-
-  bool valid_override = HandleOverride(effective_override, &m);
+  bool valid_override = true;
+  if (override_value) valid_override = HandleOverride(override_value, &m);
 
   if (!valid_value && !valid_override) {
     return 1;

@@ -342,11 +342,6 @@ std::unique_ptr<Record> RecordFileReader::ReadRecord(ReadPos& pos) {
     // Read until meeting a RECORD_SPLIT_END record.
     std::vector<char> buf;
     while (header.type == SIMPLE_PERF_RECORD_SPLIT) {
-      if (header.size > file_size_) {
-        LOG(ERROR) << "invalid record: heade.size is greater than file size";
-        return nullptr;
-      }
-
       buf.insert(buf.end(), p.get() + Record::header_size(), p.get() + header.size);
       p = ReadRecordWithDecompression(pos);
       if (!p || !header.Parse(p.get())) {

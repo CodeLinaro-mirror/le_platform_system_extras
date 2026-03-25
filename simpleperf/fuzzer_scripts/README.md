@@ -21,32 +21,31 @@ platform development:
 
 The `repro_fuzz_issue.sh` script automates the process of building the fuzzer,
 pushing the necessary binaries and libraries to the device, and running a
-specific test case.
+specific testcase.
 
-### Running with a test case
+### Running with a testcase
 
 To reproduce a crash or issue found by a fuzzer:
 
 ```bash
-./repro_fuzz_issue.sh /path/to/repro_test_case
+./repro_fuzz_issue.sh /path/to/repro_testcase
 ```
 
-The script will:
-
-1.  Build `libsimpleperf_report_fuzzer` for your current `lunch` target.
-2.  Create `/data/fuzzer` on the device.
-3.  Sync the fuzzer binary and its required shared libraries to the device.
-4.  Push the specific test case to the device.
-5.  Execute the fuzzer on the device using the provided testcase with the
-    correct `LD_LIBRARY_PATH`.
+The script will: 1. Build `libsimpleperf_report_fuzzer` for your current `lunch`
+target. 2. Create `/data/fuzzer` on the device. 3. Sync the fuzzer binary and
+its required shared libraries to the device. 4. Push the specified testcase to
+the device. 5. Execute the fuzzer on the device using the provided testcase with
+the correct `LD_LIBRARY_PATH`.
 
 ### Syncing binaries only
 
-If you want to build and sync the binaries without running a specific test case:
-`./repro_fuzz_issue.sh`
+If you want to build and sync the binaries without running a specific testcase:
+
+```bash
+./repro_fuzz_issue.sh
+```
 
 ## Device Paths
 
 -   **Binaries & Libraries:** `/data/fuzzer`
--   **Test cases:** `/data/fuzzer/testcase`
-
+-   **Testcases:** `/data/fuzzer/testcase`
