@@ -147,3 +147,20 @@ TEST(utils, ReadableCount) {
   ASSERT_EQ(ReadableCount(1000), "1,000");
   ASSERT_EQ(ReadableCount(123456789), "123,456,789");
 }
+
+// @CddTest = 6.1/C-0-2
+TEST(utils, BitsToString) {
+  // Verifies correct behavior for an empty vector.
+  ASSERT_EQ(BitsToString({}), "0b");
+
+  // Verifies correct behavior for a single bit.
+  ASSERT_EQ(BitsToString({true}), "0b1");
+  ASSERT_EQ(BitsToString({false}), "0b0");
+
+  // Verifies that bits are appended in reverse order (from rbegin to rend).
+  ASSERT_EQ(BitsToString({true, false}), "0b01");
+  ASSERT_EQ(BitsToString({false, true}), "0b10");
+
+  // Verifies correct behavior for a longer sequence.
+  ASSERT_EQ(BitsToString({true, false, true, false, true}), "0b10101");
+}
