@@ -735,37 +735,32 @@ bool DumpBranchListFile(std::string filename) {
     for (size_t i = 0; i < sorted_keys.size(); ++i) {
       const auto& key = sorted_keys[i];
       const auto& binary = etm_data[key];
-      PrintIndented(1, "binary[%zu].path: %s\n", i, key.path.c_str());
-      PrintIndented(1, "binary[%zu].build_id: %s\n", i, key.build_id.ToString().c_str());
-      PrintIndented(1, "binary[%zu].binary_type: %s\n", i, DsoTypeToString(binary.dso_type));
+      PrintIndented(1, "binary[{}].path: {}\n", i, key.path);
+      PrintIndented(1, "binary[{}].build_id: {}\n", i, key.build_id.ToString());
+      PrintIndented(1, "binary[{}].binary_type: {}\n", i, DsoTypeToString(binary.dso_type));
       if (binary.dso_type == DSO_KERNEL) {
-        PrintIndented(1, "binary[%zu].kernel_start_addr: 0x%" PRIx64 "\n", i,
-                      key.kernel_start_addr);
+        PrintIndented(1, "binary[{}].kernel_start_addr: 0x{:x}\n", i, key.kernel_start_addr);
       } else if (binary.dso_type == DSO_KERNEL_MODULE) {
         const auto& module_info = key.kernel_module_info;
-        PrintIndented(1, "binary[%zu].kernel_module_memory_start: 0x%" PRIx64 "\n", i,
+        PrintIndented(1, "binary[{}].kernel_module_memory_start: 0x{:x}\n", i,
                       module_info.memory_start);
-        PrintIndented(1, "binary[%zu].kernel_module_memory_end: 0x%" PRIx64 "\n", i,
+        PrintIndented(1, "binary[{}].kernel_module_memory_end: 0x{:x}\n", i,
                       module_info.memory_end);
-        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_name: %s\n", i,
-                      module_info.memory_symbol_name.c_str());
-        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_addr: 0x%" PRIx64 "\n", i,
+        PrintIndented(1, "binary[{}].kernel_module_memory_symbol_name: {}\n", i,
+                      module_info.memory_symbol_name);
+        PrintIndented(1, "binary[{}].kernel_module_memory_symbol_addr: 0x{:x}\n", i,
                       module_info.memory_symbol_addr);
-        PrintIndented(1, "binary[%zu].kernel_module_memory_symbol_len: 0x%" PRIx64 "\n", i,
+        PrintIndented(1, "binary[{}].kernel_module_memory_symbol_len: 0x{:x}\n", i,
                       module_info.memory_symbol_len);
       }
-      PrintIndented(1, "binary[%zu].addrs:\n", i);
+      PrintIndented(1, "binary[{}].addrs:\n", i);
       size_t addr_id = 0;
       for (const auto& [addr, branches] : binary.GetOrderedBranchMap()) {
-        PrintIndented(2, "addr[%zu]: 0x%" PRIx64 "\n", addr_id++, addr);
+        PrintIndented(2, "addr[{}]: 0x{:x}\n", addr_id++, addr);
         size_t branch_id = 0;
         for (const auto& [branch, count] : branches) {
-          std::string s = "0b";
-          for (auto it = branch.rbegin(); it != branch.rend(); ++it) {
-            s.push_back(*it ? '1' : '0');
-          }
-          PrintIndented(3, "branch[%zu].branch: %s\n", branch_id, s.c_str());
-          PrintIndented(3, "branch[%zu].count: %" PRIu64 "\n", branch_id, count);
+          PrintIndented(3, "branch[{}].branch: {}\n", branch_id, BitsToString(branch));
+          PrintIndented(3, "branch[{}].count: {}\n", branch_id, count);
           ++branch_id;
         }
       }
@@ -775,23 +770,21 @@ bool DumpBranchListFile(std::string filename) {
     PrintIndented(0, "lbr_data:\n");
     for (size_t i = 0; i < lbr_data.samples.size(); ++i) {
       const auto& sample = lbr_data.samples[i];
-      PrintIndented(1, "sample[%zu].binary_id: %u\n", i, sample.binary_id);
-      PrintIndented(1, "sample[%zu].vaddr_in_file: 0x%" PRIx64 "\n", i, sample.vaddr_in_file);
-      PrintIndented(1, "sample[%zu].branches:\n", i);
+      PrintIndented(1, "sample[{}].binary_id: {}\n", i, sample.binary_id);
+      PrintIndented(1, "sample[{}].vaddr_in_file: 0x{:x}\n", i, sample.vaddr_in_file);
+      PrintIndented(1, "sample[{}].branches:\n", i);
       for (size_t j = 0; j < sample.branches.size(); ++j) {
         const auto& branch = sample.branches[j];
-        PrintIndented(2, "branch[%zu].from_binary_id: %u\n", j, branch.from_binary_id);
-        PrintIndented(2, "branch[%zu].from_vaddr_in_file: 0x%" PRIx64 "\n", j,
-                      branch.from_vaddr_in_file);
-        PrintIndented(2, "branch[%zu].to_binary_id: %u\n", j, branch.to_binary_id);
-        PrintIndented(2, "branch[%zu].to_vaddr_in_file: 0x%" PRIx64 "\n", j,
-                      branch.to_vaddr_in_file);
+        PrintIndented(2, "branch[{}].from_binary_id: {}\n", j, branch.from_binary_id);
+        PrintIndented(2, "branch[{}].from_vaddr_in_file: 0x{:x}\n", j, branch.from_vaddr_in_file);
+        PrintIndented(2, "branch[{}].to_binary_id: {}\n", j, branch.to_binary_id);
+        PrintIndented(2, "branch[{}].to_vaddr_in_file: 0x{:x}\n", j, branch.to_vaddr_in_file);
       }
     }
     for (size_t i = 0; i < lbr_data.binaries.size(); ++i) {
       const auto& binary = lbr_data.binaries[i];
-      PrintIndented(1, "binary[%zu].path: %s\n", i, binary.path.c_str());
-      PrintIndented(1, "binary[%zu].build_id: %s\n", i, binary.build_id.ToString().c_str());
+      PrintIndented(1, "binary[{}].path: {}\n", i, binary.path);
+      PrintIndented(1, "binary[{}].build_id: {}\n", i, binary.build_id.ToString());
     }
   }
   return true;
