@@ -18,6 +18,7 @@
 
 #include <limits>
 #include <memory>
+#include <print>
 
 #include <android-base/strings.h>
 
@@ -119,6 +120,7 @@ static const char* ProtoUnwindingErrorCodeToString(
     case proto::Sample_UnwindingResult::ERROR_INVALID_ELF:
       return "ERROR_INVALID_ELF";
   }
+  return "UNKNOWN";
 }
 
 struct SampleEntry {
@@ -283,8 +285,8 @@ bool ReportSampleCommand::Run(const std::vector<std::string>& args) {
   std::unique_ptr<google::protobuf::io::CopyingOutputStreamAdaptor> protobuf_os;
   std::unique_ptr<google::protobuf::io::CodedOutputStream> protobuf_coded_os;
   if (use_protobuf_) {
-    if (fprintf(report_fp_, "%s", PROT_FILE_MAGIC) != 10 ||
-        fwrite(&PROT_FILE_VERSION, sizeof(uint16_t), 1, report_fp_) != 1u) {
+    std::print(report_fp_, "{}", PROT_FILE_MAGIC);
+    if (fwrite(&PROT_FILE_VERSION, sizeof(uint16_t), 1, report_fp_) != 1u) {
       PLOG(ERROR) << "Failed to write magic/version";
       return false;
     }

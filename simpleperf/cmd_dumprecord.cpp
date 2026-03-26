@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include <inttypes.h>
 #include <stdint.h>
 
 #include <map>
+#include <print>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -299,23 +299,21 @@ static const std::string GetFeatureNameOrUnknown(int feature) {
 
 void DumpRecordCommand::DumpFileHeader() {
   const FileHeader& header = record_file_reader_->FileHeader();
-  printf("magic: ");
+  std::print("magic: ");
   for (size_t i = 0; i < 8; ++i) {
-    printf("%c", header.magic[i]);
+    std::print("{}", header.magic[i]);
   }
-  printf("\n");
-  printf("header_size: %" PRId64 "\n", header.header_size);
+  std::println("");
+  std::println("header_size: {}", header.header_size);
   if (header.header_size != sizeof(header)) {
     PLOG(WARNING) << "record file header size " << header.header_size
                   << "doesn't match expected header size " << sizeof(header);
   }
-  printf("attr_size: %" PRId64 "\n", header.attr_size);
-  printf("attrs[file section]: offset %" PRId64 ", size %" PRId64 "\n", header.attrs.offset,
-         header.attrs.size);
-  printf("data[file section]: offset %" PRId64 ", size %" PRId64 "\n", header.data.offset,
-         header.data.size);
-  printf("event_types[file section]: offset %" PRId64 ", size %" PRId64 "\n",
-         header.event_types.offset, header.event_types.size);
+  std::println("attr_size: {}", header.attr_size);
+  std::println("attrs[file section]: offset {}, size {}", header.attrs.offset, header.attrs.size);
+  std::println("data[file section]: offset {}, size {}", header.data.offset, header.data.size);
+  std::println("event_types[file section]: offset {}, size {}", header.event_types.offset,
+               header.event_types.size);
 
   std::vector<int> features;
   for (size_t i = 0; i < FEAT_MAX_NUM; ++i) {
@@ -326,7 +324,7 @@ void DumpRecordCommand::DumpFileHeader() {
     }
   }
   for (auto& feature : features) {
-    printf("feature: %s\n", GetFeatureNameOrUnknown(feature).c_str());
+    std::println("feature: {}", GetFeatureNameOrUnknown(feature));
   }
 }
 
@@ -334,14 +332,14 @@ void DumpRecordCommand::DumpAttrSection() {
   const EventAttrIds& attrs = record_file_reader_->AttrSection();
   for (size_t i = 0; i < attrs.size(); ++i) {
     const auto& attr = attrs[i];
-    printf("attr %zu:\n", i + 1);
+    std::println("attr {}:", i + 1);
     DumpPerfEventAttr(attr.attr, 1);
     if (!attr.ids.empty()) {
-      printf("  ids:");
+      std::print("  ids:");
       for (const auto& id : attr.ids) {
-        printf(" %" PRId64, id);
+        std::print(" {}", id);
       }
-      printf("\n");
+      std::println("");
     }
   }
 }

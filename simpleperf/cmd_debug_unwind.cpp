@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <print>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -96,20 +97,20 @@ struct UnwindingStat {
     if (unwinding_sample_count == 0) {
       return;
     }
-    fprintf(fp, "unwinding_sample_count: %" PRIu64 "\n", unwinding_sample_count);
-    fprintf(fp, "average_unwinding_time: %.3f us\n",
-            total_unwinding_time_in_ns / 1e3 / unwinding_sample_count);
-    fprintf(fp, "max_unwinding_time: %.3f us\n", max_unwinding_time_in_ns / 1e3);
+    std::println(fp, "unwinding_sample_count: {}", unwinding_sample_count);
+    std::println(fp, "average_unwinding_time: {:.3f} us",
+                 total_unwinding_time_in_ns / 1e3 / unwinding_sample_count);
+    std::println(fp, "max_unwinding_time: {:.3f} us", max_unwinding_time_in_ns / 1e3);
 
     if (!mem_before_unwinding.vm_peak.empty()) {
-      fprintf(fp, "memory_change_VmPeak: %s -> %s\n", mem_before_unwinding.vm_peak.c_str(),
-              mem_after_unwinding.vm_peak.c_str());
-      fprintf(fp, "memory_change_VmSize: %s -> %s\n", mem_before_unwinding.vm_size.c_str(),
-              mem_after_unwinding.vm_size.c_str());
-      fprintf(fp, "memory_change_VmHwM: %s -> %s\n", mem_before_unwinding.vm_hwm.c_str(),
-              mem_after_unwinding.vm_hwm.c_str());
-      fprintf(fp, "memory_change_VmRSS: %s -> %s\n", mem_before_unwinding.vm_rss.c_str(),
-              mem_after_unwinding.vm_rss.c_str());
+      std::println(fp, "memory_change_VmPeak: {} -> {}", mem_before_unwinding.vm_peak,
+                   mem_after_unwinding.vm_peak);
+      std::println(fp, "memory_change_VmSize: {} -> {}", mem_before_unwinding.vm_size,
+                   mem_after_unwinding.vm_size);
+      std::println(fp, "memory_change_VmHwM: {} -> {}", mem_before_unwinding.vm_hwm,
+                   mem_after_unwinding.vm_hwm);
+      std::println(fp, "memory_change_VmRSS: {} -> {}", mem_before_unwinding.vm_rss,
+                   mem_after_unwinding.vm_rss);
     }
   }
 };
@@ -208,11 +209,11 @@ class RecordFileProcessor {
 };
 
 static void DumpUnwindingResult(const UnwindingResult& result, FILE* fp) {
-  fprintf(fp, "unwinding_used_time: %.3f us\n", result.used_time / 1e3);
-  fprintf(fp, "unwinding_error_code: %" PRIu64 "\n", result.error_code);
-  fprintf(fp, "unwinding_error_addr: 0x%" PRIx64 "\n", result.error_addr);
-  fprintf(fp, "stack_start: 0x%" PRIx64 "\n", result.stack_start);
-  fprintf(fp, "stack_end: 0x%" PRIx64 "\n", result.stack_end);
+  std::println(fp, "unwinding_used_time: {:.3f} us", result.used_time / 1e3);
+  std::println(fp, "unwinding_error_code: {}", result.error_code);
+  std::println(fp, "unwinding_error_addr: 0x{:x}", result.error_addr);
+  std::println(fp, "stack_start: 0x{:x}", result.stack_start);
+  std::println(fp, "stack_end: 0x{:x}", result.stack_end);
 }
 
 class SampleUnwinder : public RecordFileProcessor {
@@ -314,14 +315,14 @@ class SampleUnwinder : public RecordFileProcessor {
 
     if (!skip_sample_print_) {
       // Print unwinding result.
-      fprintf(out_fp_, "sample_time: %" PRIu64 "\n", r.Timestamp());
+      std::println(out_fp_, "sample_time: {}", r.Timestamp());
       DumpUnwindingResult(unwinder_->GetUnwindingResult(), out_fp_);
       std::vector<CallChainReportEntry> entries = callchain_report_builder_.Build(thread, ips, 0);
       for (size_t i = 0; i < entries.size(); i++) {
         size_t id = i + 1;
         auto& entry = entries[i];
-        fprintf(out_fp_, "ip_%zu: 0x%" PRIx64 "\n", id, entry.ip);
-        fprintf(out_fp_, "sp_%zu: 0x%" PRIx64 "\n", id, sps[i]);
+        std::println(out_fp_, "ip_{}: 0x{:x}", id, entry.ip);
+        std::println(out_fp_, "sp_{}: 0x{:x}", id, sps[i]);
 
         Dso* dso = entry.map->dso;
         uint64_t pgoff = entry.map->pgoff;
@@ -336,13 +337,13 @@ class SampleUnwinder : public RecordFileProcessor {
           }
           entry.symbol = dso->FindSymbol(entry.vaddr_in_file);
         }
-        fprintf(out_fp_, "map_%zu: [0x%" PRIx64 "-0x%" PRIx64 "], pgoff 0x%" PRIx64 "\n", id,
-                entry.map->start_addr, entry.map->get_end_addr(), pgoff);
-        fprintf(out_fp_, "dso_%zu: %s\n", id, dso->Path().c_str());
-        fprintf(out_fp_, "vaddr_in_file_%zu: 0x%" PRIx64 "\n", id, entry.vaddr_in_file);
-        fprintf(out_fp_, "symbol_%zu: %s\n", id, entry.symbol->DemangledName());
+        std::println(out_fp_, "map_{}: [0x{:x}-0x{:x}], pgoff 0x{:x}", id, entry.map->start_addr,
+                     entry.map->get_end_addr(), pgoff);
+        std::println(out_fp_, "dso_{}: {}", id, dso->Path());
+        std::println(out_fp_, "vaddr_in_file_{}: 0x{:x}", id, entry.vaddr_in_file);
+        std::println(out_fp_, "symbol_{}: {}", id, entry.symbol->DemangledName());
       }
-      fprintf(out_fp_, "\n");
+      std::println(out_fp_, "");
     }
     return true;
   }
@@ -547,23 +548,23 @@ class ReportGenerator : public RecordFileProcessor {
       ips.erase(ips.begin(), ips.begin() + kernel_ip_count);
     }
 
-    fprintf(out_fp_, "sample_time: %" PRIu64 "\n", sr.Timestamp());
+    std::println(out_fp_, "sample_time: {}", sr.Timestamp());
     DumpUnwindingResult(unwinding_r.unwinding_result, out_fp_);
     // Print callchain.
     std::vector<CallChainReportEntry> entries = callchain_report_builder_.Build(thread, ips, 0);
     for (size_t i = 0; i < entries.size(); i++) {
       size_t id = i + 1;
       const auto& entry = entries[i];
-      fprintf(out_fp_, "ip_%zu: 0x%" PRIx64 "\n", id, entry.ip);
+      std::println(out_fp_, "ip_{}: 0x{:x}", id, entry.ip);
       if (i < unwinding_r.callchain.length) {
-        fprintf(out_fp_, "unwinding_ip_%zu: 0x%" PRIx64 "\n", id, unwinding_r.callchain.ips[i]);
-        fprintf(out_fp_, "unwinding_sp_%zu: 0x%" PRIx64 "\n", id, unwinding_r.callchain.sps[i]);
+        std::println(out_fp_, "unwinding_ip_{}: 0x{:x}", id, unwinding_r.callchain.ips[i]);
+        std::println(out_fp_, "unwinding_sp_{}: 0x{:x}", id, unwinding_r.callchain.sps[i]);
       }
-      fprintf(out_fp_, "map_%zu: [0x%" PRIx64 "-0x%" PRIx64 "], pgoff 0x%" PRIx64 "\n", id,
-              entry.map->start_addr, entry.map->get_end_addr(), entry.map->pgoff);
-      fprintf(out_fp_, "dso_%zu: %s\n", id, entry.map->dso->Path().c_str());
-      fprintf(out_fp_, "vaddr_in_file_%zu: 0x%" PRIx64 "\n", id, entry.vaddr_in_file);
-      fprintf(out_fp_, "symbol_%zu: %s\n", id, entry.symbol->DemangledName());
+      std::println(out_fp_, "map_{}: [0x{:x}-0x{:x}], pgoff 0x{:x}", id, entry.map->start_addr,
+                   entry.map->get_end_addr(), entry.map->pgoff);
+      std::println(out_fp_, "dso_{}: {}", id, entry.map->dso->Path());
+      std::println(out_fp_, "vaddr_in_file_{}: 0x{:x}", id, entry.vaddr_in_file);
+      std::println(out_fp_, "symbol_{}: {}", id, entry.symbol->DemangledName());
     }
     // Print regs.
     uint64_t stack_addr = 0;
@@ -575,7 +576,7 @@ class ReportGenerator : public RecordFileProcessor {
         stack_addr = value;
         for (size_t i = 0; i < 64; i++) {
           if (regs.GetRegValue(i, &value)) {
-            fprintf(out_fp_, "reg_%s: 0x%" PRIx64 "\n", GetRegName(i, regs.arch).c_str(), value);
+            std::println(out_fp_, "reg_{}: 0x{:x}", GetRegName(i, regs.arch), value);
           }
         }
       }
@@ -587,15 +588,15 @@ class ReportGenerator : public RecordFileProcessor {
       const char* end = stack.data + stack.size;
       uint64_t value;
       while (p + 8 <= end) {
-        fprintf(out_fp_, "stack_%" PRIx64 ":", stack_addr);
+        std::print(out_fp_, "stack_{:x}:", stack_addr);
         for (size_t i = 0; i < 4 && p + 8 <= end; ++i) {
           MoveFromBinaryFormat(value, p);
-          fprintf(out_fp_, " %016" PRIx64, value);
+          std::print(out_fp_, " {:016x}", value);
         }
-        fprintf(out_fp_, "\n");
+        std::println(out_fp_, "");
         stack_addr += 32;
       }
-      fprintf(out_fp_, "\n");
+      std::println(out_fp_, "");
     }
   }
 

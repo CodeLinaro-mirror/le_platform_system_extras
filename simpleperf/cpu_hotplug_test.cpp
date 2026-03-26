@@ -24,6 +24,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <print>
 #include <thread>
 #include <unordered_map>
 
@@ -469,15 +470,16 @@ TEST(cpu_offline, offline_while_recording_on_another_cpu) {
 int main(int argc, char** argv) {
   for (int i = 1; i < argc; ++i) {
     if (strcmp(argv[i], "--help") == 0) {
-      printf("--long_test_duration <second> Set test duration for long tests. Default is 120s.\n");
-      printf(
-          "--cpu_hotplug_interval <microseconds> Set cpu hotplug interval. Default is 1000us.\n");
-      printf("--verbose  Show verbose log.\n");
+      std::println(
+          "--long_test_duration <second> Set test duration for long tests. Default is 120s.");
+      std::println(
+          "--cpu_hotplug_interval <microseconds> Set cpu hotplug interval. Default is 1000us.");
+      std::println("--verbose  Show verbose log.");
     } else if (strcmp(argv[i], "--long_test_duration") == 0) {
       if (i + 1 < argc) {
         int second_count = atoi(argv[i + 1]);
         if (second_count <= 0) {
-          fprintf(stderr, "Invalid arg for --long_test_duration.\n");
+          std::println(stderr, "Invalid arg for --long_test_duration.");
           return 1;
         }
         test_duration_for_long_tests = std::chrono::seconds(second_count);
@@ -487,7 +489,7 @@ int main(int argc, char** argv) {
       if (i + 1 < argc) {
         int microsecond_count = atoi(argv[i + 1]);
         if (microsecond_count <= 0) {
-          fprintf(stderr, "Invalid arg for --cpu_hotplug_interval\n");
+          std::println(stderr, "Invalid arg for --cpu_hotplug_interval");
           return 1;
         }
         cpu_hotplug_interval = std::chrono::microseconds(microsecond_count);

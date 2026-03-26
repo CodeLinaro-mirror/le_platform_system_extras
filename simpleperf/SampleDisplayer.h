@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <optional>
+#include <print>
 #include <string>
 
 #include <android-base/logging.h>
@@ -35,12 +36,12 @@ std::string DisplayAccumulatedOverhead(const EntryT* sample, const InfoT* info) 
   uint64_t period = sample->period + sample->accumulated_period;
   uint64_t total_period = info->total_period;
   double percentage = (total_period != 0) ? 100.0 * period / total_period : 0.0;
-  return android::base::StringPrintf("%.2f%%", percentage);
+  return std::format("{:.2f}%", percentage);
 }
 
 template <typename EntryT>
 std::string DisplayAccumulatedPeriod(const EntryT* sample) {
-  return android::base::StringPrintf("%" PRIu64, sample->period + sample->accumulated_period);
+  return std::to_string(sample->period + sample->accumulated_period);
 }
 
 template <typename EntryT, typename InfoT>
@@ -48,19 +49,19 @@ std::string DisplaySelfOverhead(const EntryT* sample, const InfoT* info) {
   uint64_t period = sample->period;
   uint64_t total_period = info->total_period;
   double percentage = (total_period != 0) ? 100.0 * period / total_period : 0.0;
-  return android::base::StringPrintf("%.2f%%", percentage);
+  return std::format("{:.2f}%", percentage);
 }
 
-#define BUILD_DISPLAY_UINT64_FUNCTION(function_name, display_part)        \
-  template <typename EntryT>                                              \
-  std::string function_name(const EntryT* sample) {                       \
-    return android::base::StringPrintf("%" PRIu64, sample->display_part); \
+#define BUILD_DISPLAY_UINT64_FUNCTION(function_name, display_part) \
+  template <typename EntryT>                                       \
+  std::string function_name(const EntryT* sample) {                \
+    return std::to_string(sample->display_part);                   \
   }
 
-#define BUILD_DISPLAY_HEX64_FUNCTION(function_name, display_part)           \
-  template <typename EntryT>                                                \
-  std::string function_name(const EntryT* sample) {                         \
-    return android::base::StringPrintf("0x%" PRIx64, sample->display_part); \
+#define BUILD_DISPLAY_HEX64_FUNCTION(function_name, display_part) \
+  template <typename EntryT>                                      \
+  std::string function_name(const EntryT* sample) {               \
+    return std::format("0x{:x}", sample->display_part);           \
   }
 
 BUILD_DISPLAY_UINT64_FUNCTION(DisplaySelfPeriod, period);
@@ -68,12 +69,12 @@ BUILD_DISPLAY_UINT64_FUNCTION(DisplaySampleCount, sample_count);
 
 template <typename EntryT>
 std::string DisplayPid(const EntryT* sample) {
-  return android::base::StringPrintf("%d", static_cast<int>(sample->pid));
+  return std::to_string(sample->pid);
 }
 
 template <typename EntryT>
 std::string DisplayTid(const EntryT* sample) {
-  return android::base::StringPrintf("%d", static_cast<int>(sample->tid));
+  return std::to_string(sample->tid);
 }
 
 template <typename EntryT>
@@ -119,11 +120,11 @@ class CallgraphDisplayer {
     }
     std::string prefix = "       ";
     if (brief_callgraph_ && sample->callchain.duplicated) {
-      fprintf(fp, "%s[skipped in brief callgraph mode]\n", prefix.c_str());
+      std::println(fp, "{}[skipped in brief callgraph mode]", prefix);
       return;
     }
-    fprintf(fp, "%s|\n", prefix.c_str());
-    fprintf(fp, "%s-- %s\n", prefix.c_str(), PrintSampleName(sample).c_str());
+    std::println(fp, "{}|", prefix);
+    std::println(fp, "{}-- {}", prefix, PrintSampleName(sample));
     prefix.append(3, ' ');
     for (size_t i = 0; i < sample->callchain.children.size(); ++i) {
       DisplayCallGraphEntry(fp, 1, prefix, sample->callchain.children[i],
@@ -144,23 +145,22 @@ class CallgraphDisplayer {
       if (percentage < percent_limit_) {
         return;
       }
-      percentage_s = android::base::StringPrintf("--%.2f%%-- ", percentage);
+      percentage_s = std::format("--{:.2f}%-- ", percentage);
     }
     prefix += "|";
-    fprintf(fp, "%s\n", prefix.c_str());
+    std::println(fp, "{}", prefix);
     if (last) {
       prefix.back() = ' ';
     }
-    fprintf(fp, "%s%s%s\n", prefix.c_str(), percentage_s.c_str(),
-            PrintSampleName(node->chain[0]).c_str());
+    std::println(fp, "{}{}{}", prefix, percentage_s, PrintSampleName(node->chain[0]));
     for (size_t i = 1; i < node->chain.size(); ++i) {
-      fprintf(fp, "%s%*s%s\n", prefix.c_str(), static_cast<int>(percentage_s.size()), "",
-              PrintSampleName(node->chain[i]).c_str());
+      std::println(fp, "{}{:>{}}{}", prefix, "", percentage_s.size(),
+                   PrintSampleName(node->chain[i]));
     }
     prefix.append(SPACES_BETWEEN_CALLGRAPH_ENTRIES, ' ');
     if (!node->children.empty() && node->period != 0) {
-      fprintf(fp, "%s|--%.2f%%-- [hit in function]\n", prefix.c_str(),
-              100.0 * node->period / (node->period + node->children_period));
+      std::println(fp, "{}|--{:.2f}%-- [hit in function]", prefix,
+                   100.0 * node->period / (node->period + node->children_period));
     }
     for (size_t i = 0; i < node->children.size(); ++i) {
       DisplayCallGraphEntry(fp, depth + 1, prefix, node->children[i],
@@ -248,13 +248,12 @@ class SampleDisplayer {
     for (size_t i = 0; i < display_v_.size(); ++i) {
       auto& item = display_v_[i];
       if (report_csv_) {
-        fprintf(fp, "%s%s", item.name.c_str(),
-                (i + 1 == display_v_.size()) ? "\n" : csv_separator_.c_str());
+        std::print(fp, "{}{}", item.name, (i + 1 == display_v_.size()) ? "\n" : csv_separator_);
       } else {
         if (i != display_v_.size() - 1) {
-          fprintf(fp, "%-*s  ", static_cast<int>(item.width), item.name.c_str());
+          std::print(fp, "{:<{}}  ", item.name, item.width);
         } else {
-          fprintf(fp, "%s\n", item.name.c_str());
+          std::println(fp, "{}", item.name);
         }
       }
     }
@@ -270,16 +269,16 @@ class SampleDisplayer {
           (item.func != nullptr) ? item.func(sample) : item.func_with_info(sample, info_);
       if (report_csv_) {
         if (data.find(csv_separator_) == std::string::npos) {
-          fprintf(fp, "%s", data.c_str());
+          std::print(fp, "{}", data);
         } else {
-          fprintf(fp, "\"%s\"", data.c_str());
+          std::print(fp, "\"{}\"", data);
         }
-        fputs((i + 1 == display_v_.size()) ? "\n" : csv_separator_.c_str(), fp);
+        std::print(fp, "{}", (i + 1 == display_v_.size()) ? "\n" : csv_separator_);
       } else {
         if (i != display_v_.size() - 1) {
-          fprintf(fp, "%-*s  ", static_cast<int>(item.width), data.c_str());
+          std::print(fp, "{:<{}}  ", data, item.width);
         } else {
-          fprintf(fp, "%s\n", data.c_str());
+          std::println(fp, "{}", data);
         }
       }
     }

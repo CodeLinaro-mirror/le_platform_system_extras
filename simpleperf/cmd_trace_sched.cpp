@@ -15,6 +15,7 @@
  */
 
 #include <memory>
+#include <print>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -329,7 +330,7 @@ void TraceSchedCommand::ReportProcessInfo(const std::vector<ProcessInfo>& proces
   for (auto& process : processes) {
     total_runtime_in_ns += process.total_runtime_in_ns;
   }
-  printf("Total Runtime: %.3f ms\n", total_runtime_in_ns / 1e6);
+  std::println("Total Runtime: {:.3f} ms", total_runtime_in_ns / 1e6);
   struct ReportEntry {
     bool is_process = false;
     uint64_t runtime_in_ns = 0;
@@ -403,14 +404,13 @@ void TraceSchedCommand::ReportProcessInfo(const std::vector<ProcessInfo>& proces
         double duration_in_ns =
             thread->spin_info.max_rate_end_timestamp - thread->spin_info.max_rate_start_timestamp;
         double running_time_in_ns = duration_in_ns * thread->spin_info.max_rate;
-        printf("Detect %" PRIu64
-               " spin loops in process %s (%d) thread %s (%d),\n"
-               "max rate at [%.6f s - %.6f s], taken %.3f ms / %.3f ms (%.2f%%).\n",
-               thread->spin_info.spinloop_count, process.name.c_str(), process.process_id,
-               thread->name.c_str(), thread->thread_id,
-               thread->spin_info.max_rate_start_timestamp / 1e9,
-               thread->spin_info.max_rate_end_timestamp / 1e9, running_time_in_ns / 1e6,
-               duration_in_ns / 1e6, percentage);
+        std::println("Detect {} spin loops in process {} ({}) thread {} ({}),",
+                     thread->spin_info.spinloop_count, process.name, process.process_id,
+                     thread->name, thread->thread_id);
+        std::println("max rate at [{:.6f} s - {:.6f} s], taken {:.3f} ms / {:.3f} ms ({:.2f}%).",
+                     thread->spin_info.max_rate_start_timestamp / 1e9,
+                     thread->spin_info.max_rate_end_timestamp / 1e9, running_time_in_ns / 1e6,
+                     duration_in_ns / 1e6, percentage);
       }
     }
   }
