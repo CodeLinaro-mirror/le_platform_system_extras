@@ -159,22 +159,6 @@ int ArchiveHelper::GetFd() {
   return GetFileDescriptor(handle_);
 }
 
-void PrintIndented(size_t indent, const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  printf("%*s", static_cast<int>(indent * 2), "");
-  vprintf(fmt, ap);
-  va_end(ap);
-}
-
-void FprintIndented(FILE* fp, size_t indent, const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  fprintf(fp, "%*s", static_cast<int>(indent * 2), "");
-  vfprintf(fp, fmt, ap);
-  va_end(ap);
-}
-
 bool IsPowerOfTwo(uint64_t value) {
   return (value != 0 && ((value & (value - 1)) == 0));
 }
@@ -553,6 +537,15 @@ std::string ReadableBytes(uint64_t bytes) {
     return StringPrintf("%.2f KB", static_cast<double>(bytes) / kKilobyte);
   }
   return StringPrintf("%" PRIu64 " B", bytes);
+}
+
+std::string BitsToString(const std::vector<bool>& bits) {
+  std::string s = "0b";
+  s.reserve(bits.size() + 2);
+  for (auto it = bits.rbegin(); it != bits.rend(); ++it) {
+    s.push_back(*it ? '1' : '0');
+  }
+  return s;
 }
 
 }  // namespace simpleperf
