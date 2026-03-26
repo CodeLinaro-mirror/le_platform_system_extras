@@ -18,7 +18,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <print>
 
+#include <iostream>
 #include <map>
 #include <optional>
 #include <string>
@@ -248,12 +250,12 @@ void TracingFile::Dump(size_t indent) const {
   PrintIndented(indent, "tracing data:\n");
   PrintIndented(indent + 1, "magic: ");
   for (size_t i = 0; i < 3u; ++i) {
-    printf("0x%x ", magic[i]);
+    std::print("0x{:x} ", magic[i]);
   }
   for (size_t i = 3; i < sizeof(magic); ++i) {
-    printf("%c", magic[i]);
+    std::print("{}", magic[i]);
   }
-  printf("\n");
+  std::println("");
   PrintIndented(indent + 1, "version: {}\n", version);
   PrintIndented(indent + 1, "endian: {}\n", endian);
   PrintIndented(indent + 1, "header_page:\n{}\n\n", header_page_file);

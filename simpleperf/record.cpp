@@ -16,8 +16,8 @@
 
 #include "record.h"
 
-#include <inttypes.h>
 #include <algorithm>
+#include <print>
 #include <unordered_map>
 
 #include <android-base/logging.h>
@@ -948,11 +948,11 @@ void SampleRecord::DumpData(size_t indent) const {
     while (p < end) {
       PrintIndented(indent + 1, "");
       for (size_t i = 0; i < 4 && p < end; ++i, ++p) {
-        printf(" %016" PRIx64, *p);
+        std::print(" {:016x}", *p);
       }
-      printf("\n");
+      std::println("");
     }
-    printf("\n");
+    std::println("");
   }
 }
 
@@ -1664,11 +1664,11 @@ void UnwindingResultRecord::DumpData(size_t indent) const {
     while (p < end) {
       PrintIndented(indent + 1, "");
       for (size_t i = 0; i < 4 && p < end; ++i, ++p) {
-        printf(" %016" PRIx64, *p);
+        std::print(" {:016x}", *p);
       }
-      printf("\n");
+      std::println("");
     }
-    printf("\n");
+    std::println("");
   }
   if (callchain.length > 0) {
     PrintIndented(indent, "callchain length={}:\n", callchain.length);
