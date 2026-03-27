@@ -25,7 +25,6 @@ package {
 
 cc_binary {
     name: "simpleperf_app_runner",
-    cpp_std: "gnu++23",
     srcs: [
         "simpleperf_app_runner.cpp",
     ],

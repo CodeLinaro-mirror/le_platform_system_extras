@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <print>
 
 #include <set>
 #include <string>
@@ -186,13 +185,13 @@ static void CheckSimpleperfArguments(std::string_view cmd_name, char** args) {
 
 int main(int argc, char* argv[]) {
   if (argc < 3) {
-    std::println(
+    fprintf(
         stderr,
         // clang-format off
 "Usage: simpleperf_app_runner package_name [options] [simpleperf cmd simpleperf_cmd_args]\n"
 "Options:\n"
 "--user uid        profile app process run by uid\n"
-"--show-app-type   show if the app is debuggable or profileable"
+"--show-app-type   show if the app is debuggable or profileable\n"
         // clang-format on
     );
     return 1;
@@ -212,11 +211,11 @@ int main(int argc, char* argv[]) {
       error(1, 0, "failed to find package %s", pkgname);
     }
     if (info->debuggable) {
-      std::println("debuggable");
+      printf("debuggable\n");
     } else if (info->profileable_from_shell) {
-      std::println("profileable");
+      printf("profileable\n");
     } else {
-      std::println("non_profileable");
+      printf("non_profileable\n");
     }
     return 0;
   }
@@ -252,7 +251,7 @@ int main(int argc, char* argv[]) {
       error(1, 0, "user id is too big: %d", user_id);
     }
     user_app_id = (AID_USER_OFFSET * user_id) + info->uid;
-    data_dir = std::format("/data/user/{}/{}", user_id, pkgname);
+    data_dir = StringPrintf("/data/user/%d/%s", user_id, pkgname);
   }
 
   // Switch to the app's user id and group id.

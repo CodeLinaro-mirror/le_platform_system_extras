@@ -54,7 +54,7 @@ struct spe_packet {
 // Sample Record formed from SPE packets.
 struct SpeSampleRecord : public SampleRecord {
  public:
-  SpeSampleRecord() : spe_event_id_(0) {};
+  SpeSampleRecord() : spe_event_id_(0){};
   SpeSampleRecord(const perf_event_attr& attr, uint64_t id, uint64_t ip, uint32_t pid, uint32_t tid,
                   uint64_t time, uint32_t cpu, uint64_t period, uint64_t addr,
                   const PerfSampleReadType& read_data, const std::vector<uint64_t>& ips,
@@ -62,7 +62,7 @@ struct SpeSampleRecord : public SampleRecord {
                   uint64_t additional_sample_type, uint64_t spe_event_id)
       : SampleRecord(attr, id, ip, pid, tid, time, cpu, period, addr, read_data, ips, stack,
                      dyn_stack_size, in_kernel, additional_sample_type),
-        spe_event_id_(spe_event_id) {};
+        spe_event_id_(spe_event_id){};
   uint64_t GetSpeEventId() const { return spe_event_id_; };
   void SetSpeEventId(uint64_t event_id) { spe_event_id_ = event_id; }
 
@@ -75,7 +75,7 @@ size_t GetSpeAttributeIndexFromEventId(size_t event_id);
 
 class SPEDecoder {
  public:
-  SPEDecoder() {};
+  SPEDecoder(){};
   static std::unique_ptr<SPEDecoder> Create();
   std::vector<SpeSampleRecord> ProcessData(uint8_t* data, size_t size, const SampleId* sample_id,
                                            const perf_event_attr& attr);

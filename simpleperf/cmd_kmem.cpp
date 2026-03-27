@@ -16,7 +16,6 @@
 
 #include "command.h"
 
-#include <print>
 #include <unordered_map>
 
 #include <android-base/logging.h>
@@ -648,7 +647,7 @@ bool KmemCommand::PrintReport() {
   }
   PrintReportContext(report_fp);
   if (use_slab_) {
-    std::println(report_fp, "\n");
+    fprintf(report_fp, "\n\n");
     PrintSlabReportContext(report_fp);
     slab_sample_tree_displayer_->DisplaySamples(report_fp, slab_sample_tree_.samples,
                                                 &slab_sample_tree_);
@@ -658,35 +657,36 @@ bool KmemCommand::PrintReport() {
 
 void KmemCommand::PrintReportContext(FILE* fp) {
   if (!record_cmdline_.empty()) {
-    std::println(fp, "Cmdline: {}", record_cmdline_);
+    fprintf(fp, "Cmdline: %s\n", record_cmdline_.c_str());
   }
-  std::println(fp, "Arch: {}", GetArchString(record_file_arch_));
+  fprintf(fp, "Arch: %s\n", GetArchString(record_file_arch_).c_str());
   for (const auto& attr : event_attrs_) {
-    std::println(fp, "Event: {} (type {}, config {})", attr.name, attr.attr.type, attr.attr.config);
+    fprintf(fp, "Event: %s (type %u, config %llu)\n", attr.name.c_str(), attr.attr.type,
+            attr.attr.config);
   }
 }
 
 void KmemCommand::PrintSlabReportContext(FILE* fp) {
-  std::println(fp, "Slab allocation information:");
-  std::println(fp, "Total requested bytes: {}", slab_sample_tree_.total_requested_bytes);
-  std::println(fp, "Total allocated bytes: {}", slab_sample_tree_.total_allocated_bytes);
+  fprintf(fp, "Slab allocation information:\n");
+  fprintf(fp, "Total requested bytes: %" PRIu64 "\n", slab_sample_tree_.total_requested_bytes);
+  fprintf(fp, "Total allocated bytes: %" PRIu64 "\n", slab_sample_tree_.total_allocated_bytes);
   uint64_t fragment =
       slab_sample_tree_.total_allocated_bytes - slab_sample_tree_.total_requested_bytes;
   double percentage = 0.0;
   if (slab_sample_tree_.total_allocated_bytes != 0) {
     percentage = 100.0 * fragment / slab_sample_tree_.total_allocated_bytes;
   }
-  std::println(fp, "Total fragment: {}, {:.2f}%", fragment, percentage);
-  std::println(fp, "Total allocations: {}", slab_sample_tree_.nr_allocations);
-  std::println(fp, "Total frees: {}", slab_sample_tree_.nr_frees);
+  fprintf(fp, "Total fragment: %" PRIu64 ", %f%%\n", fragment, percentage);
+  fprintf(fp, "Total allocations: %" PRIu64 "\n", slab_sample_tree_.nr_allocations);
+  fprintf(fp, "Total frees: %" PRIu64 "\n", slab_sample_tree_.nr_frees);
   percentage = 0.0;
   if (slab_sample_tree_.nr_allocations != 0) {
     percentage =
         100.0 * slab_sample_tree_.nr_cross_cpu_allocations / slab_sample_tree_.nr_allocations;
   }
-  std::println(fp, "Total cross cpu allocation/free: {}, {:.2f}%",
-               slab_sample_tree_.nr_cross_cpu_allocations, percentage);
-  std::println(fp, "");
+  fprintf(fp, "Total cross cpu allocation/free: %" PRIu64 ", %f%%\n",
+          slab_sample_tree_.nr_cross_cpu_allocations, percentage);
+  fprintf(fp, "\n");
 }
 
 }  // namespace

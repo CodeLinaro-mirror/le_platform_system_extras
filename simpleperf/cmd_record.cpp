@@ -27,7 +27,6 @@
 #include <chrono>
 #include <filesystem>
 #include <optional>
-#include <print>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -517,14 +516,14 @@ std::string RecordCommand::LongHelpString() const {
   }
   std::string buffer_size_str;
   if (process_buffer_size == system_wide_buffer_size) {
-    buffer_size_str = std::format("{}M", process_buffer_size);
+    buffer_size_str = android::base::StringPrintf("%" PRIu64 "M", process_buffer_size);
   } else {
-    buffer_size_str = std::format(
-        "{}M for process recording and {}M\n"
-        "                                 for system wide recording",
-        process_buffer_size, system_wide_buffer_size);
+    buffer_size_str =
+        android::base::StringPrintf("%" PRIu64 "M for process recording and %" PRIu64
+                                    "M\n                                 for system wide recording",
+                                    process_buffer_size, system_wide_buffer_size);
   }
-  return std::vformat(long_help_string_, std::make_format_args(buffer_size_str));
+  return android::base::StringPrintf(long_help_string_.c_str(), buffer_size_str.c_str());
 }
 
 void RecordCommand::Run(const std::vector<std::string>& args, int* exit_code) {
@@ -599,7 +598,7 @@ bool RecordCommand::ForkBackgroundProcess(int* exit_code) {
   }
   if (pid != 0) {
     // In the parent process.
-    std::println("{}", pid);
+    printf("%d\n", pid);
     *exit_code = 0;
     return true;
   }
@@ -849,8 +848,8 @@ bool RecordCommand::DoRecording(Workload* workload) {
     start_profiling_fd_.reset();
   }
   if (stdio_controls_profiling_) {
-    std::println("started");
-    std::fflush(stdout);
+    printf("started\n");
+    fflush(stdout);
   }
   if (!event_selection_set_.GetIOEventLoop()->RunLoop()) {
     return false;
@@ -1859,8 +1858,8 @@ bool RecordCommand::ProcessControlCmd(IOEventLoop* loop) {
   } else {
     LOG(ERROR) << "unknown control cmd: " << cmd;
   }
-  std::println("{}", result ? "ok" : "error");
-  std::fflush(stdout);
+  printf("%s\n", result ? "ok" : "error");
+  fflush(stdout);
   return result;
 }
 
