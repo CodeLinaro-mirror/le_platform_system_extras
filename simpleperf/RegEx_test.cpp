@@ -29,6 +29,11 @@ TEST(RegEx, smoke) {
   ASSERT_FALSE(re->Match("aba"));
   ASSERT_TRUE(re->Match("bbb"));
 
+  ASSERT_FALSE(re->ThreadUnsafeSearch("aaa"));
+  ASSERT_TRUE(re->ThreadUnsafeSearch("aba"));
+  ASSERT_FALSE(re->ThreadUnsafeMatch("aba"));
+  ASSERT_TRUE(re->ThreadUnsafeMatch("bbb"));
+
   auto match = re->SearchAll("aaa");
   ASSERT_FALSE(match->IsValid());
   match = re->SearchAll("ababb");
