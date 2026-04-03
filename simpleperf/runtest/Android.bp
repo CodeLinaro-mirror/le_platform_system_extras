@@ -26,6 +26,7 @@ package {
 cc_defaults {
     name: "simpleperf_runtest_defaults",
     host_supported: true,
+    cpp_std: "gnu++23",
     cflags: [
         "-Wall",
         "-Wextra",

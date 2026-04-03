@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <inttypes.h>
 #include <libgen.h>
 #include <signal.h>
 #include <sys/mman.h>
@@ -21,7 +20,9 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <unistd.h>
+
 #include <optional>
+#include <print>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -31,7 +32,6 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
-#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android-base/unique_fd.h>
 #if defined(__ANDROID__)
@@ -59,7 +59,6 @@ namespace {
 
 using android::base::ParseUint;
 using android::base::Realpath;
-using android::base::StringAppendF;
 
 struct SymbolInfo {
   Dso* dso;
@@ -522,16 +521,11 @@ bool MonitorCommand::ProcessRecord(Record* record) {
 }
 
 void MonitorCommand::DumpSampleRecord(const SampleRecord& sr) {
-  std::string output("sample");
-  StringAppendF(&output, " name=%s", event_names_[sr.id_data.id].c_str());
-  StringAppendF(&output, " ip=%p", reinterpret_cast<void*>(sr.ip_data.ip));
   SymbolInfo s = GetSymbolInfo(sr.tid_data.pid, sr.tid_data.tid, sr.ip_data.ip, sr.InKernel());
-  StringAppendF(&output, " symbol=%s (%s[+%" PRIx64 "])", s.symbol->DemangledName(),
-                s.dso->Path().c_str(), s.vaddr_in_file);
-  StringAppendF(&output, " pid=%u tid=%u", sr.tid_data.pid, sr.tid_data.tid);
-  StringAppendF(&output, " cpu=%u", sr.cpu_data.cpu);
-  printf("%s\n", output.c_str());
-  fflush(stdout);
+  std::println("sample name={} ip=0x{:x} symbol={} ({}[+0x{:x}]) pid={} tid={} cpu={}",
+               event_names_[sr.id_data.id], sr.ip_data.ip, s.symbol->DemangledName(), s.dso->Path(),
+               s.vaddr_in_file, sr.tid_data.pid, sr.tid_data.tid, sr.cpu_data.cpu);
+  std::fflush(stdout);
 }
 
 void MonitorCommand::DumpSampleCallchain(const SampleRecord& sr) {
@@ -546,12 +540,10 @@ void MonitorCommand::DumpSampleCallchain(const SampleRecord& sr) {
       }
       SymbolInfo s =
           GetSymbolInfo(sr.tid_data.pid, sr.tid_data.tid, sr.callchain_data.ips[i], in_kernel);
-      std::string output("sample callchain");
-      StringAppendF(&output, " %s (%s[+%" PRIx64 "])", s.symbol->DemangledName(),
-                    s.dso->Path().c_str(), s.vaddr_in_file);
-      printf("%s\n", output.c_str());
+      std::println(" sample callchain {} ({}[+0x{:x}])", s.symbol->DemangledName(), s.dso->Path(),
+                   s.vaddr_in_file);
     }
-    fflush(stdout);
+    std::fflush(stdout);
   }
 }
 

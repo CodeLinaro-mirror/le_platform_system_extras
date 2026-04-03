@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <print>
 
 #include <algorithm>
 #include <map>
@@ -531,12 +532,12 @@ std::string ReadableCount(uint64_t count) {
 // Convert bytes to human friendly mode.
 std::string ReadableBytes(uint64_t bytes) {
   if (bytes >= kMegabyte) {
-    return StringPrintf("%.2f MB", static_cast<double>(bytes) / kMegabyte);
+    return std::format("{:.2f} MB", static_cast<double>(bytes) / kMegabyte);
   }
   if (bytes >= kKilobyte) {
-    return StringPrintf("%.2f KB", static_cast<double>(bytes) / kKilobyte);
+    return std::format("{:.2f} KB", static_cast<double>(bytes) / kKilobyte);
   }
-  return StringPrintf("%" PRIu64 " B", bytes);
+  return std::format("{} B", bytes);
 }
 
 std::string BitsToString(const std::vector<bool>& bits) {
