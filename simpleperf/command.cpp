@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <map>
+#include <print>
 #include <string>
 #include <vector>
 
@@ -221,7 +222,7 @@ void RegisterAllCommands() {
 static void StderrLogger(android::base::LogId, android::base::LogSeverity severity, const char*,
                          const char* file, unsigned int line, const char* message) {
   char severity_char = android::base::kSeverityChars[severity];
-  fprintf(stderr, "simpleperf %c %s:%u] %s\n", severity_char, file, line, message);
+  std::println(stderr, "simpleperf {} {}:{}] {}", severity_char, file, line, message);
 }
 
 bool log_to_android_buffer = false;
@@ -291,8 +292,8 @@ bool RunSimpleperfCmd(int argc, char** argv) {
   LOG(DEBUG) << "command '" << command_name << "' "
              << (exit_code == 0 ? "finished successfully" : "failed");
   // Quick exit to avoid the cost of freeing memory and closing files.
-  fflush(stdout);
-  fflush(stderr);
+  std::fflush(stdout);
+  std::fflush(stderr);
   _Exit(exit_code);
   return exit_code == 0;
 }

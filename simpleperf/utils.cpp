@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <print>
 
 #include <algorithm>
 #include <map>
@@ -157,22 +158,6 @@ bool ArchiveHelper::GetEntryData(ZipEntry& entry, std::vector<uint8_t>* data) {
 
 int ArchiveHelper::GetFd() {
   return GetFileDescriptor(handle_);
-}
-
-void PrintIndented(size_t indent, const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  printf("%*s", static_cast<int>(indent * 2), "");
-  vprintf(fmt, ap);
-  va_end(ap);
-}
-
-void FprintIndented(FILE* fp, size_t indent, const char* fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  fprintf(fp, "%*s", static_cast<int>(indent * 2), "");
-  vfprintf(fp, fmt, ap);
-  va_end(ap);
 }
 
 bool IsPowerOfTwo(uint64_t value) {
@@ -547,12 +532,21 @@ std::string ReadableCount(uint64_t count) {
 // Convert bytes to human friendly mode.
 std::string ReadableBytes(uint64_t bytes) {
   if (bytes >= kMegabyte) {
-    return StringPrintf("%.2f MB", static_cast<double>(bytes) / kMegabyte);
+    return std::format("{:.2f} MB", static_cast<double>(bytes) / kMegabyte);
   }
   if (bytes >= kKilobyte) {
-    return StringPrintf("%.2f KB", static_cast<double>(bytes) / kKilobyte);
+    return std::format("{:.2f} KB", static_cast<double>(bytes) / kKilobyte);
   }
-  return StringPrintf("%" PRIu64 " B", bytes);
+  return std::format("{} B", bytes);
+}
+
+std::string BitsToString(const std::vector<bool>& bits) {
+  std::string s = "0b";
+  s.reserve(bits.size() + 2);
+  for (auto it = bits.rbegin(); it != bits.rend(); ++it) {
+    s.push_back(*it ? '1' : '0');
+  }
+  return s;
 }
 
 }  // namespace simpleperf
