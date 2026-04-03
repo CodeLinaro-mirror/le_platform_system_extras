@@ -1,0 +1,5 @@
+libext4-utils (1.0.0) unstable; urgency=medium
+
+  * Converted from RPM spec file.
+
+ -- haoranlu <halu@qti.qualcomm.com>  Tue, 17 Mar 2026 03:03:33 +0000

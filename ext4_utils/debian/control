@@ -1,0 +1,28 @@
+Source: libext4-utils
+Section: libs
+Priority: optional
+Maintainer: haoranlu <halu@qti.qualcomm.com>
+Build-Depends: libcutils-dev, libselinux-dev, libsparse-dev, libtool, pkgconf | pkg-config, debhelper-compat (= 13)
+Standards-Version: 4.6.0
+Homepage: https://www.codelinaro.org/
+
+Package: libext4-utils
+Architecture: arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Android ext4-utils tools
+ Command line tools to make sparse images from ext4 file system
+ images and android images(.img) with ext4 file systems.
+ This package contains tools like mkuserimg, ext4fixup
+ and make_ext4fs tools.
+ Command line tools to make sparse images from ext4 file system
+ images and android images(.img) with ext4 file systems.
+ This package contains tools like mkuserimg, ext4fixup and
+ make_ext4fs tools. This package contains symbolic links,header
+ files,and related items necessary for software development.
+
+Package: libext4-utils-dev
+Architecture: arm64
+Section: libdevel
+Depends: ${shlibs:Depends}, ${misc:Depends}, libext4-utils(= ${binary:Version})
+Description: Android ext4-utils tools
+

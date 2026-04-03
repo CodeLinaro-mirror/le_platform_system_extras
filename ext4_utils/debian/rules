@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	autoreconf -if
+	dh_auto_configure -- --with-core-includes=$(CURDIR)/ext4_utils/
+	dh_auto_build
+
+override_dh_auto_install:
+	dh_auto_install
+	rm $(CURDIR)/debian/tmp/usr/lib/*/*.la
+	rm $(CURDIR)/debian/tmp/usr/lib/*/*.a
+
+override_dh_fixperms:
+	dh_fixperms
+	rm -rf debian/libbase/usr/share/doc debian/libbase-dev/usr/share/doc
