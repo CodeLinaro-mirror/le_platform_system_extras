@@ -15,7 +15,6 @@
  */
 
 #include <stdio.h>
-#include <print>
 #include <string>
 #include <vector>
 
@@ -63,7 +62,7 @@ bool HelpCommand::Run(const std::vector<std::string>& args) {
 }
 
 void HelpCommand::PrintShortHelp() {
-  std::print(
+  printf(
       // clang-format off
 "Usage: simpleperf [common options] subcommand [args_for_subcommand]\n"
 "common options:\n"
@@ -80,12 +79,12 @@ void HelpCommand::PrintShortHelp() {
   );
   for (auto& cmd_name : GetAllCommandNames()) {
     std::unique_ptr<Command> cmd = CreateCommandInstance(cmd_name);
-    std::println("    {:<20}{}", cmd_name, cmd->ShortHelpString());
+    printf("    %-20s%s\n", cmd_name.c_str(), cmd->ShortHelpString().c_str());
   }
 }
 
 void HelpCommand::PrintLongHelpForOneCommand(const Command& command) {
-  std::println("{}", command.LongHelpString());
+  printf("%s\n", command.LongHelpString().c_str());
 }
 
 }  // namespace

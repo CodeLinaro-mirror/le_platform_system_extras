@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/prctl.h>
+
 #include <algorithm>
 #include <chrono>
 #include <optional>
-#include <print>
 #include <set>
 #include <string>
 #include <string_view>
@@ -101,10 +101,10 @@ std::string CounterSummary::ReadableCountValue(bool csv) {
   if (type_name == "cpu-clock" || type_name == "task-clock") {
     // Convert nanoseconds to milliseconds.
     double value = count / 1e6;
-    return std::format("{:f}(ms)", value);
+    return android::base::StringPrintf("%lf(ms)", value);
   }
   if (csv) {
-    return std::to_string(count);
+    return android::base::StringPrintf("%" PRIu64, count);
   }
   return ReadableCount(count);
 }
@@ -154,13 +154,13 @@ void CounterSummaries::Show(FILE* fp) {
 void CounterSummaries::ShowCSV(FILE* fp, bool show_thread, bool show_cpu) {
   for (auto& s : summaries_) {
     if (show_thread) {
-      std::print(fp, "{},{},{},", s.thread->name, s.thread->pid, s.thread->tid);
+      fprintf(fp, "%s,%d,%d,", s.thread->name.c_str(), s.thread->pid, s.thread->tid);
     }
     if (show_cpu) {
-      std::print(fp, "{},", s.cpu);
+      fprintf(fp, "%d,", s.cpu);
     }
-    std::println(fp, "{},{},{},{}", s.readable_count, s.Name(), s.comment,
-                 (s.auto_generated ? "(generated)," : ""));
+    fprintf(fp, "%s,%s,%s,%s\n", s.readable_count.c_str(), s.Name().c_str(), s.comment.c_str(),
+            (s.auto_generated ? "(generated)," : ""));
   }
 }
 
@@ -201,31 +201,32 @@ void CounterSummaries::ShowText(FILE* fp, bool show_thread, bool show_cpu) {
     adjust_width(width[i++], s.comment.size());
   }
 
-  std::print(fp, "# ");
+  fprintf(fp, "# ");
   for (size_t i = 0; i < titles.size(); i++) {
     if (titles[i] == "count") {
-      std::print(fp, "{:>{}}", titles[i], width[i]);
+      fprintf(fp, "%*s", static_cast<int>(width[i]), titles[i].c_str());
     } else {
-      std::print(fp, "{:<{}}", titles[i], width[i]);
+      fprintf(fp, "%-*s", static_cast<int>(width[i]), titles[i].c_str());
     }
     if (i + 1 < titles.size()) {
-      std::print(fp, "  ");
+      fprintf(fp, "  ");
     }
   }
-  std::println(fp, "");
+  fprintf(fp, "\n");
 
   for (auto& s : summaries_) {
     size_t i = 0;
     if (show_thread) {
-      std::print(fp, "  {:<{}}", s.thread->name, width[i++]);
-      std::print(fp, "  {:<{}}", s.thread->pid, width[i++]);
-      std::print(fp, "  {:<{}}", s.thread->tid, width[i++]);
+      fprintf(fp, "  %-*s", static_cast<int>(width[i++]), s.thread->name.c_str());
+      fprintf(fp, "  %-*d", static_cast<int>(width[i++]), s.thread->pid);
+      fprintf(fp, "  %-*d", static_cast<int>(width[i++]), s.thread->tid);
     }
     if (show_cpu) {
-      std::print(fp, "  {:<{}}", s.cpu, width[i++]);
+      fprintf(fp, "  %-*d", static_cast<int>(width[i++]), s.cpu);
     }
-    std::println(fp, "  {:>{}}  {:<{}}   # {:<{}}{}", s.readable_count, width[i], s.Name(),
-                 width[i + 1], s.comment, width[i + 2], (s.auto_generated ? " (generated)" : ""));
+    fprintf(fp, "  %*s  %-*s   # %-*s%s\n", static_cast<int>(width[i]), s.readable_count.c_str(),
+            static_cast<int>(width[i + 1]), s.Name().c_str(), static_cast<int>(width[i + 2]),
+            s.comment.c_str(), (s.auto_generated ? " (generated)" : ""));
   }
 }
 
@@ -240,7 +241,7 @@ std::string CounterSummaries::GetCommentForSummary(const CounterSummary& s,
   if (s.type_name == "task-clock") {
     double run_sec = s.count / 1e9;
     double used_cpus = run_sec / duration_in_sec;
-    return std::format("{:f}{}cpus used", used_cpus, sap_mid);
+    return android::base::StringPrintf("%f%ccpus used", used_cpus, sap_mid);
   }
   if (s.type_name == "cpu-clock") {
     return "";
@@ -250,13 +251,13 @@ std::string CounterSummaries::GetCommentForSummary(const CounterSummary& s,
       return "";
     }
     double ghz = static_cast<double>(s.count) / s.runtime_in_ns;
-    return std::format("{:f}{}GHz", ghz, sap_mid);
+    return android::base::StringPrintf("%f%cGHz", ghz, sap_mid);
   }
   if (s.type_name == "instructions" && s.count != 0) {
     const CounterSummary* other = FindSummary("cpu-cycles", s.modifier, s.thread, s.cpu);
     if (other != nullptr && other->IsMonitoredAtTheSameTime(s)) {
       double cpi = static_cast<double>(other->count) / s.count;
-      return std::format("{:f}{}cycles per instruction", cpi, sap_mid);
+      return android::base::StringPrintf("%f%ccycles per instruction", cpi, sap_mid);
     }
   }
   std::string rate_comment = GetRateComment(s, sap_mid);
@@ -269,15 +270,15 @@ std::string CounterSummaries::GetCommentForSummary(const CounterSummary& s,
   double runtime_in_sec = static_cast<double>(s.runtime_in_ns) / 1e9;
   double rate = s.count / runtime_in_sec;
   if (rate >= 1e9 - 1e5) {
-    return std::format("{:.3f}{}G/sec", rate / 1e9, sap_mid);
+    return android::base::StringPrintf("%.3f%cG/sec", rate / 1e9, sap_mid);
   }
   if (rate >= 1e6 - 1e2) {
-    return std::format("{:.3f}{}M/sec", rate / 1e6, sap_mid);
+    return android::base::StringPrintf("%.3f%cM/sec", rate / 1e6, sap_mid);
   }
   if (rate >= 1e3) {
-    return std::format("{:.3f}{}K/sec", rate / 1e3, sap_mid);
+    return android::base::StringPrintf("%.3f%cK/sec", rate / 1e3, sap_mid);
   }
-  return std::format("{:.3f}{}/sec", rate, sap_mid);
+  return android::base::StringPrintf("%.3f%c/sec", rate, sap_mid);
 }
 
 std::string CounterSummaries::GetRateComment(const CounterSummary& s, char sep) {
@@ -302,7 +303,7 @@ std::string CounterSummaries::GetRateComment(const CounterSummary& s, char sep) 
     const CounterSummary* other = FindSummary(event_name, s.modifier, s.thread, s.cpu);
     if (other != nullptr && other->IsMonitoredAtTheSameTime(s) && other->count != 0) {
       double miss_rate = static_cast<double>(s.count) / other->count;
-      return std::format("{:f}%{}{}", miss_rate * 100, sep, rate_desc);
+      return android::base::StringPrintf("%f%%%c%s", miss_rate * 100, sep, rate_desc.c_str());
     }
   }
   return "";
@@ -1031,8 +1032,7 @@ void StatCommand::PrintHardwareCounters() {
       LOG(WARNING) << "Failed to get CPU PMU hardware counters on cpu " << cpu;
       continue;
     }
-    std::println("There are {} CPU PMU hardware counters available on cpu {}.", counters.value(),
-                 cpu);
+    printf("There are %zu CPU PMU hardware counters available on cpu %d.\n", counters.value(), cpu);
   }
 }
 
@@ -1186,29 +1186,28 @@ std::string NormalizeCsvEntry(std::string_view entry) {
 bool StatCommand::ShowCounters(const std::vector<CountersInfo>& counters, double duration_in_sec,
                                FILE* fp) {
   if (csv_) {
-    std::print(fp, "Performance counter statistics,\n");
+    fprintf(fp, "Performance counter statistics,\n");
   } else {
-    std::print(fp, "Performance counter statistics:\n\n");
+    fprintf(fp, "Performance counter statistics:\n\n");
   }
 
   if (verbose_mode_) {
     for (auto& counters_info : counters) {
       for (auto& counter_info : counters_info.counters) {
         if (csv_) {
-          std::print(fp,
-                     "{},tid,{},cpu,{},count,{},time_enabled,{}"
-                     ",time running,{},id,{},\n",
-                     NormalizeCsvEntry(counters_info.event_name), counter_info.tid,
-                     counter_info.cpu, counter_info.counter.value,
-                     counter_info.counter.time_enabled, counter_info.counter.time_running,
-                     counter_info.counter.id);
+          fprintf(fp,
+                  "%s,tid,%d,cpu,%d,count,%" PRIu64 ",time_enabled,%" PRIu64
+                  ",time running,%" PRIu64 ",id,%" PRIu64 ",\n",
+                  NormalizeCsvEntry(counters_info.event_name).c_str(), counter_info.tid,
+                  counter_info.cpu, counter_info.counter.value, counter_info.counter.time_enabled,
+                  counter_info.counter.time_running, counter_info.counter.id);
         } else {
-          std::print(fp,
-                     "{}(tid {}, cpu {}): count {}, time_enabled {}"
-                     ", time running {}, id {}\n",
-                     counters_info.event_name, counter_info.tid, counter_info.cpu,
-                     counter_info.counter.value, counter_info.counter.time_enabled,
-                     counter_info.counter.time_running, counter_info.counter.id);
+          fprintf(fp,
+                  "%s(tid %d, cpu %d): count %" PRIu64 ", time_enabled %" PRIu64
+                  ", time running %" PRIu64 ", id %" PRIu64 "\n",
+                  counters_info.event_name.c_str(), counter_info.tid, counter_info.cpu,
+                  counter_info.counter.value, counter_info.counter.time_enabled,
+                  counter_info.counter.time_running, counter_info.counter.id);
         }
       }
     }
@@ -1225,9 +1224,9 @@ bool StatCommand::ShowCounters(const std::vector<CountersInfo>& counters, double
   summaries.Show(fp);
 
   if (csv_) {
-    std::print(fp, "Total test time,{:f},seconds,\n", duration_in_sec);
+    fprintf(fp, "Total test time,%lf,seconds,\n", duration_in_sec);
   } else {
-    std::print(fp, "\nTotal test time: {:f} seconds.\n", duration_in_sec);
+    fprintf(fp, "\nTotal test time: %lf seconds.\n", duration_in_sec);
   }
   return true;
 }

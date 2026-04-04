@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <print>
-
 #if defined(__ANDROID__)
 #include <android-base/properties.h>
 #include <sys/prctl.h>
@@ -61,9 +59,9 @@ bool AndroidSecurityCheck() {
     std::string prop_name = "security.perf_harden";
     if (android::base::GetProperty(prop_name, "") != "0") {
       if (!android::base::SetProperty(prop_name, "0")) {
-        std::print(stderr,
-                   "failed to set system property security.perf_harden to 0.\n"
-                   "Try using `adb shell setprop security.perf_harden 0` to allow profiling.\n");
+        fprintf(stderr,
+                "failed to set system property security.perf_harden to 0.\n"
+                "Try using `adb shell setprop security.perf_harden 0` to allow profiling.\n");
         return false;
       }
     }

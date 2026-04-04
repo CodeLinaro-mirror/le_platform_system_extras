@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include <algorithm>
 #include <functional>
 #include <map>
-#include <print>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -27,6 +27,7 @@
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
+#include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 
 #include "RecordFilter.h"
@@ -391,7 +392,8 @@ using ReportCmdCallgraphDisplayer = CallgraphDisplayer<SampleEntry, CallChainNod
 class ReportCmdCallgraphDisplayerWithVaddrInFile : public ReportCmdCallgraphDisplayer {
  protected:
   std::string PrintSampleName(const SampleEntry* sample) override {
-    return std::format("{} [+0x{:x}]", sample->symbol->DemangledName(), sample->vaddr_in_file);
+    return android::base::StringPrintf("%s [+0x%" PRIx64 "]", sample->symbol->DemangledName(),
+                                       sample->vaddr_in_file);
   }
 };
 
@@ -1091,22 +1093,23 @@ bool ReportCommand::PrintReport() {
       continue;
     }
     if (i != 0) {
-      std::print(report_fp, "\n");
+      fprintf(report_fp, "\n");
     }
     SampleTree& sample_tree = sample_tree_[i];
-    std::print(report_fp, "Event: {} (type {}, config 0x{:x}, config1 0x{:x}, config2: 0x{:x})\n",
-               attr_names_[i], event_attrs_[i].type, event_attrs_[i].config,
-               event_attrs_[i].config1, event_attrs_[i].config2);
-    std::print(report_fp, "Samples: {}\n", sample_tree.total_samples);
+    fprintf(report_fp, "Event: %s (type %u, config 0x%llx, config1 0x%llx, config2: 0x%llx)\n",
+            attr_names_[i].c_str(), event_attrs_[i].type, event_attrs_[i].config,
+            event_attrs_[i].config1, event_attrs_[i].config2);
+    fprintf(report_fp, "Samples: %" PRIu64 "\n", sample_tree.total_samples);
     if (sample_tree.total_error_callchains != 0) {
-      std::print(report_fp, "Error Callchains: {}, {:.2f}%\n", sample_tree.total_error_callchains,
-                 sample_tree.total_error_callchains * 100.0 / sample_tree.total_samples);
+      fprintf(report_fp, "Error Callchains: %" PRIu64 ", %f%%\n",
+              sample_tree.total_error_callchains,
+              sample_tree.total_error_callchains * 100.0 / sample_tree.total_samples);
     }
     const char* period_prefix = trace_offcpu_ ? "Time in ns" : "Event count";
-    std::print(report_fp, "{}: {}\n\n", period_prefix, sample_tree.total_period);
+    fprintf(report_fp, "%s: %" PRIu64 "\n\n", period_prefix, sample_tree.total_period);
     sample_tree_displayer_->DisplaySamples(report_fp, sample_tree.samples, &sample_tree);
   }
-  std::fflush(report_fp);
+  fflush(report_fp);
   if (ferror(report_fp) != 0) {
     PLOG(ERROR) << "print report failed";
     return false;
@@ -1116,9 +1119,9 @@ bool ReportCommand::PrintReport() {
 
 void ReportCommand::PrintReportContext(FILE* report_fp) {
   if (!record_cmdline_.empty()) {
-    std::print(report_fp, "Cmdline: {}\n", record_cmdline_);
+    fprintf(report_fp, "Cmdline: %s\n", record_cmdline_.c_str());
   }
-  std::print(report_fp, "Arch: {}\n", GetArchString(record_file_arch_));
+  fprintf(report_fp, "Arch: %s\n", GetArchString(record_file_arch_).c_str());
 }
 
 }  // namespace

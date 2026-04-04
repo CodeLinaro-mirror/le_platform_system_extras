@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <print>
 
 constexpr int LOOP_COUNT = 100000000;
 
@@ -22,13 +21,13 @@ int main() {
     pthread_t thread;
     int ret = pthread_create(&thread, nullptr, ChildThreadFunction, nullptr);
     if (ret != 0) {
-      std::println(stderr, "pthread_create failed: {}", strerror(ret));
+      fprintf(stderr, "pthread_create failed: %s\n", strerror(ret));
       exit(1);
     }
     MainThreadFunction();
     ret = pthread_join(thread, nullptr);
     if (ret != 0) {
-      std::println(stderr, "pthread_join failed: {}", strerror(ret));
+      fprintf(stderr, "pthread_join failed: %s\n", strerror(ret));
       exit(1);
     }
   }

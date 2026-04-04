@@ -21,7 +21,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <print>
 #include <string>
 #include <thread>
 
@@ -733,8 +732,8 @@ class AutoFDOWriter {
     std::sort(keys.begin(), keys.end(),
               [](const BinaryKey& key1, const BinaryKey& key2) { return key1.path < key2.path; });
     if (keys.size() > 1) {
-      std::println(output_fp.get(),
-                   "// Please split this file. AutoFDO only accepts profile for one binary.");
+      fprintf(output_fp.get(),
+              "// Please split this file. AutoFDO only accepts profile for one binary.\n");
     }
     for (const auto& key : keys) {
       const AutoFDOBinaryInfo& binary = binary_map_[key];
@@ -753,9 +752,10 @@ class AutoFDOWriter {
         }
       }
       std::sort(range_counts.begin(), range_counts.end());
-      std::println(output_fp.get(), "{}", range_counts.size());
+      fprintf(output_fp.get(), "%zu\n", range_counts.size());
       for (const auto& p : range_counts) {
-        std::println(output_fp.get(), "{:x}-{:x}:{}", p.first.first, p.first.second, p.second);
+        fprintf(output_fp.get(), "%" PRIx64 "-%" PRIx64 ":%" PRIu64 "\n", p.first.first,
+                p.first.second, p.second);
       }
 
       // Write addr_count_map. Sort the output by addrs.
@@ -768,9 +768,9 @@ class AutoFDOWriter {
         }
       }
       std::sort(address_counts.begin(), address_counts.end());
-      std::println(output_fp.get(), "{}", address_counts.size());
+      fprintf(output_fp.get(), "%zu\n", address_counts.size());
       for (const auto& p : address_counts) {
-        std::println(output_fp.get(), "{:x}:{}", p.first, p.second);
+        fprintf(output_fp.get(), "%" PRIx64 ":%" PRIu64 "\n", p.first, p.second);
       }
 
       // Write branch_count_map. Sort the output by addrs.
@@ -785,14 +785,15 @@ class AutoFDOWriter {
         }
       }
       std::sort(branch_counts.begin(), branch_counts.end());
-      std::println(output_fp.get(), "{}", branch_counts.size());
+      fprintf(output_fp.get(), "%zu\n", branch_counts.size());
       for (const auto& p : branch_counts) {
-        std::println(output_fp.get(), "{:x}->{:x}:{}", p.first.first, p.first.second, p.second);
+        fprintf(output_fp.get(), "%" PRIx64 "->%" PRIx64 ":%" PRIu64 "\n", p.first.first,
+                p.first.second, p.second);
       }
 
       // Write the binary path in comment.
-      std::println(output_fp.get(), "// build_id: {}", key.build_id.ToString());
-      std::println(output_fp.get(), "// {}\n", key.path);
+      fprintf(output_fp.get(), "// build_id: %s\n", key.build_id.ToString().c_str());
+      fprintf(output_fp.get(), "// %s\n\n", key.path.c_str());
     }
     return true;
   }
@@ -816,8 +817,8 @@ class AutoFDOWriter {
     std::sort(keys.begin(), keys.end(),
               [](const BinaryKey& key1, const BinaryKey& key2) { return key1.path < key2.path; });
     if (keys.size() > 1) {
-      std::println(output_fp.get(),
-                   "// Please split this file. BOLT only accepts profile for one binary.");
+      fprintf(output_fp.get(),
+              "// Please split this file. BOLT only accepts profile for one binary.\n");
     }
 
     for (const auto& key : keys) {
@@ -829,7 +830,8 @@ class AutoFDOWriter {
       }
       std::sort(range_counts.begin(), range_counts.end());
       for (const auto& p : range_counts) {
-        std::println(output_fp.get(), "F {:x} {:x} {}", p.first.first, p.first.second, p.second);
+        fprintf(output_fp.get(), "F %" PRIx64 " %" PRIx64 " %" PRIu64 "\n", p.first.first,
+                p.first.second, p.second);
       }
 
       // Write branch_count_map. Sort the output by addrs.
@@ -839,12 +841,13 @@ class AutoFDOWriter {
       }
       std::sort(branch_counts.begin(), branch_counts.end());
       for (const auto& p : branch_counts) {
-        std::println(output_fp.get(), "B {:x} {:x} {} 0", p.first.first, p.first.second, p.second);
+        fprintf(output_fp.get(), "B %" PRIx64 " %" PRIx64 " %" PRIu64 " 0\n", p.first.first,
+                p.first.second, p.second);
       }
 
       // Write the binary path in comment.
-      std::println(output_fp.get(), "// build_id: {}", key.build_id.ToString());
-      std::println(output_fp.get(), "// {}", key.path);
+      fprintf(output_fp.get(), "// build_id: %s\n", key.build_id.ToString().c_str());
+      fprintf(output_fp.get(), "// %s\n", key.path.c_str());
     }
     return true;
   }
@@ -1372,7 +1375,7 @@ class InjectCommand : public Command {
 }  // namespace
 
 void RegisterInjectCommand() {
-  RegisterCommand("inject", [] { return std::unique_ptr<Command>(new InjectCommand); });
+  return RegisterCommand("inject", [] { return std::unique_ptr<Command>(new InjectCommand); });
 }
 
 }  // namespace simpleperf
