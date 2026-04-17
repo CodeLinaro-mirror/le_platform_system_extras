@@ -94,6 +94,7 @@ std::unique_ptr<RecordFileReader> RecordFileReader::CreateInstance(const std::st
     return nullptr;
   }
   reader->UseRecordingEnvironment();
+  reader->SortEventAttrsForSpe();
   return reader;
 }
 
@@ -210,6 +211,33 @@ bool RecordFileReader::ReadAttrSection() {
   return true;
 }
 
+void RecordFileReader::SortEventAttrsForSpe() {
+  bool spe_attribute_present = false;
+  size_t original_spe_attr_index = 0;
+  for (size_t i = 0; i < event_attrs_.size(); i++) {
+    if (IsSpeEventType(event_attrs_[i].attr)) {
+      original_spe_attr_index = i;
+      spe_attribute_present = true;
+      break;
+    }
+  }
+  if (spe_attribute_present) {
+    // For SPE events there is only one attribute, while for PMU events there are
+    // separate attributes for each event.
+    // SPE attribute will be replicated so there will be separate event_attr for each SPE
+    // event. Make sure SPE attr is the last in the list.
+    if (original_spe_attr_index != (event_attrs_.size() - 1)) {
+      auto spe_it = event_attrs_.begin() + original_spe_attr_index;
+      std::rotate(spe_it, spe_it + 1, event_attrs_.end());
+      for (size_t i = original_spe_attr_index; i < event_attrs_.size(); ++i) {
+        for (auto id : event_attrs_[i].ids) {
+          event_id_to_attr_map_[id] = i;
+        }
+      }
+    }
+  }
+}
+
 bool RecordFileReader::ReadFeatureSectionDescriptors() {
   std::vector<int> features;
   for (size_t i = 0; i < sizeof(header_.features); ++i) {
@@ -310,7 +338,6 @@ std::unique_ptr<Record> RecordFileReader::ReadRecord(ReadPos& pos) {
   if (!header.Parse(p.get())) {
     return nullptr;
   }
-
   if (header.type == SIMPLE_PERF_RECORD_SPLIT) {
     // Read until meeting a RECORD_SPLIT_END record.
     std::vector<char> buf;
@@ -382,6 +409,10 @@ std::unique_ptr<char[]> RecordFileReader::ReadRecordWithDecompression(ReadPos& p
       if (output.size() >= sizeof(perf_event_header)) {
         auto header = reinterpret_cast<const perf_event_header*>(output.data());
         if (header->size <= output.size()) {
+          if (header->size < sizeof(perf_event_header)) {
+            LOG(ERROR) << "invalid record size " << header->size;
+            return nullptr;
+          }
           auto p = std::make_unique<char[]>(header->size);
           memcpy(p.get(), output.data(), header->size);
           decompressor_->ConsumeOutputData(header->size);

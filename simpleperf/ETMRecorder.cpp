@@ -107,10 +107,11 @@ void ETMRecorder::BuildEventTypes(std::set<EventType>& event_types) {
   if (etm_event_type == -1) {
     return;
   }
-  event_types.emplace("cs-etm", etm_event_type, 0, "Coresight ETM instruction tracing", "arm");
+  event_types.emplace("cs-etm", etm_event_type, 0, 0, 0, "Coresight ETM instruction tracing",
+                      "arm");
   if (CheckSinkSupport() && !etr_sink_configs_.empty()) {
     for (const auto& sink_name : std::views::keys(etr_sink_configs_)) {
-      event_types.emplace("cs-etm/@" + sink_name + "/", etm_event_type, 0,
+      event_types.emplace("cs-etm/@" + sink_name + "/", etm_event_type, 0, 0, 0,
                           "Coresight ETM instruction tracing (via " + sink_name + ")", "arm");
     }
   }

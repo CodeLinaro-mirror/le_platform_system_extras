@@ -20,6 +20,19 @@ on property:persist.device_config.runtime_native_boot.bootloader_override=* && p
   wait_for_prop arm64.memtag.bootctl_loaded 1
   exec -- /system/bin/mtectrl ${arm64.memtag.bootctl:-none} ${persist.device_config.runtime_native_boot.bootloader_override:-default}
 
+on property:persist.vendor.mte_launcher.enable_mte=true && property:ro.arm64.memtag.bootctl_supported=1
+    wait_for_prop arm64.memtag.bootctl_loaded 1
+    # Enable MTE on the next boot
+    setprop arm64.memtag.bootctl memtag
+    # Set the default configuration to be async mode
+    setprop arm64.memtag.default async
+
+on property:persist.vendor.mte_launcher.enable_mte=false && property:ro.arm64.memtag.bootctl_supported=1
+    wait_for_prop arm64.memtag.bootctl_loaded 1
+    # Set MTE back to default settings on the next boot
+    setprop arm64.memtag.bootctl none
+    setprop arm64.memtag.default none
+
 # adbd gets initialized in init, so run before that. this makes sure that the
 # user does not change the value before we initialize it
 on early-boot && property:ro.arm64.memtag.bootctl_supported=1
