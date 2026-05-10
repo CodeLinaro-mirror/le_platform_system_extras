@@ -24,6 +24,7 @@
 #include <fstream>
 #include <functional>
 #include <optional>
+#include <print>
 #include <set>
 #include <string>
 #include <vector>
@@ -246,8 +247,17 @@ struct BinaryReader {
   bool error;
 };
 
-void PrintIndented(size_t indent, const char* fmt, ...);
-void FprintIndented(FILE* fp, size_t indent, const char* fmt, ...);
+template <typename... Args>
+void PrintIndented(size_t indent, std::format_string<Args...> fmt, Args&&... args) {
+  std::print("{:>{}}", "", indent * 2);
+  std::print(fmt, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+void FprintIndented(std::FILE* fp, size_t indent, std::format_string<Args...> fmt, Args&&... args) {
+  std::print(fp, "{:>{}}", "", indent * 2);
+  std::print(fp, fmt, std::forward<Args>(args)...);
+}
 
 bool IsPowerOfTwo(uint64_t value);
 
@@ -312,6 +322,8 @@ void OverflowSafeAdd(uint64_t& dest, uint64_t add);
 
 std::string ReadableCount(uint64_t count);
 std::string ReadableBytes(uint64_t bytes);
+
+std::string BitsToString(const std::vector<bool>& bits);
 
 }  // namespace simpleperf
 
