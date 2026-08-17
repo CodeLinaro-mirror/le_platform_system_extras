@@ -39,6 +39,13 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "string.h"
 
 
+typedef enum {
+    CRYPTMM_NAND_DEVICE = 0,
+    CRYPTMM_EMMC_DEVICE,
+    CRYPTMM_UFS_DEVICE,
+    CRYPTMM_NO_DEVICE = 0x7FFFFFFF
+} cryptmm_storage_type_t;
+
 /************************************************************************************
  * Return a handle for the configuration file with the encrytion-meta and
  * mount configuration for a partition on disk.
@@ -48,7 +55,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *************************************************************************************/
 int cryptfs_init_crypt_info_handle();
 
-
+int cryptfs_init_crypt_info_handle_storage(cryptmm_storage_type_t storage_type);
 
 
 /*************************************************************************************
