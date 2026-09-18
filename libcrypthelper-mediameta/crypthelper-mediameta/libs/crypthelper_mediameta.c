@@ -42,6 +42,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MAPPER_CONF_FILE ("/etc/conf/media-encryption.conf")
 
+#define MAPPER_CONF_FILE_EMMC  "/etc/conf/media-encryption_emmc.conf"
+#define MAPPER_CONF_FILE_UFS   "/etc/conf/media-encryption_ufs.conf"
+
 /*
 *  Checks if the file descriptor has reached EOF.
 */
@@ -128,6 +131,34 @@ int cryptfs_init_crypt_info_handle(){
    return fd;
 }
 
+
+int cryptfs_init_crypt_info_handle_storage(cryptmm_storage_type_t storage_type)
+{
+    const char *path = NULL;
+    int fd;
+
+    switch (storage_type) {
+    case CRYPTMM_EMMC_DEVICE:
+        path = MAPPER_CONF_FILE_EMMC;
+        break;
+    case CRYPTMM_UFS_DEVICE:
+        path = MAPPER_CONF_FILE_UFS;
+        break;
+    default:
+        path = NULL;
+        break;
+    }
+
+    /* Try storage-specific config first */
+    if (path) {
+        fd = open(path, O_RDONLY);
+        if (fd >= 0)
+            return fd;
+    }
+
+    /* Fallback to legacy config */
+    return cryptfs_init_crypt_info_handle();
+}
 
 
 struct mntent* crtypfs_get_crypt_info (int handle, char** key_loc, char** real_blk_device) {
